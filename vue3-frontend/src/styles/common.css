@@ -1,0 +1,433 @@
+/**
+ * 公共样式 - 可复用的基础样式类
+ * 基于 CSS 变量构建，确保样式一致性
+ */
+
+/* ==================== 基础重置 ==================== */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+/* ==================== 布局工具类 ==================== */
+
+/* Flex 布局 */
+.flex {
+  display: flex;
+}
+
+.flex-col {
+  display: flex;
+  flex-direction: column;
+}
+
+.flex-center {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.flex-between {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.flex-wrap {
+  flex-wrap: wrap;
+}
+
+.flex-1 {
+  flex: 1;
+}
+
+.flex-shrink-0 {
+  flex-shrink: 0;
+}
+
+/* Gap 间距 */
+.gap-xs { gap: var(--spacing-xs); }
+.gap-sm { gap: var(--spacing-sm); }
+.gap-md { gap: var(--spacing-md); }
+.gap-lg { gap: var(--spacing-lg); }
+.gap-xl { gap: var(--spacing-xl); }
+
+/* ==================== 文字工具类 ==================== */
+
+/* 文字颜色 */
+.text-primary { color: var(--color-text-primary); }
+.text-secondary { color: var(--color-text-secondary); }
+.text-tertiary { color: var(--color-text-tertiary); }
+.text-muted { color: var(--color-text-placeholder); }
+
+/* 文字大小 */
+.text-xs { font-size: var(--font-size-xs); }
+.text-sm { font-size: var(--font-size-sm); }
+.text-base { font-size: var(--font-size-base); }
+.text-md { font-size: var(--font-size-md); }
+.text-lg { font-size: var(--font-size-lg); }
+.text-xl { font-size: var(--font-size-xl); }
+
+/* 文字粗细 */
+.font-normal { font-weight: var(--font-weight-normal); }
+.font-medium { font-weight: var(--font-weight-medium); }
+.font-semibold { font-weight: var(--font-weight-semibold); }
+.font-bold { font-weight: var(--font-weight-bold); }
+
+/* 文字截断 */
+.truncate {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.line-clamp-2 {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* ==================== 间距工具类 ==================== */
+
+/* Padding */
+.p-sm { padding: var(--spacing-sm); }
+.p-md { padding: var(--spacing-md); }
+.p-lg { padding: var(--spacing-lg); }
+.p-xl { padding: var(--spacing-xl); }
+
+.px-sm { padding-left: var(--spacing-sm); padding-right: var(--spacing-sm); }
+.px-md { padding-left: var(--spacing-md); padding-right: var(--spacing-md); }
+.px-lg { padding-left: var(--spacing-lg); padding-right: var(--spacing-lg); }
+
+.py-sm { padding-top: var(--spacing-sm); padding-bottom: var(--spacing-sm); }
+.py-md { padding-top: var(--spacing-md); padding-bottom: var(--spacing-md); }
+.py-lg { padding-top: var(--spacing-lg); padding-bottom: var(--spacing-lg); }
+
+/* Margin */
+.m-sm { margin: var(--spacing-sm); }
+.m-md { margin: var(--spacing-md); }
+.m-lg { margin: var(--spacing-lg); }
+.m-xl { margin: var(--spacing-xl); }
+
+.mb-sm { margin-bottom: var(--spacing-sm); }
+.mb-md { margin-bottom: var(--spacing-md); }
+.mb-lg { margin-bottom: var(--spacing-lg); }
+.mb-xl { margin-bottom: var(--spacing-xl); }
+
+/* ==================== 边框和圆角 ==================== */
+
+.border { border: 1px solid var(--color-border-primary); }
+.border-light { border: 1px solid var(--color-border-secondary); }
+
+.rounded-sm { border-radius: 2px; }
+.rounded-md { border-radius: 2px; }
+.rounded-lg { border-radius: 2px; }
+.rounded-xl { border-radius: 2px; }
+.rounded-full { border-radius: var(--radius-full); }
+
+/* ==================== 背景色 ==================== */
+
+.bg-white { background-color: var(--color-bg-primary); }
+.bg-secondary { background-color: var(--color-bg-secondary); }
+.bg-tertiary { background-color: var(--color-bg-tertiary); }
+.bg-primary-light { background-color: var(--color-primary-light); }
+
+/* ==================== 阴影 ==================== */
+
+.shadow-sm { box-shadow: var(--shadow-sm); }
+.shadow-md { box-shadow: var(--shadow-md); }
+.shadow-lg { box-shadow: var(--shadow-lg); }
+
+/* ==================== 过渡动画 ==================== */
+
+.transition-fast { transition: all var(--transition-fast); }
+.transition-normal { transition: all var(--transition-normal); }
+.transition-slow { transition: all var(--transition-slow); }
+
+/* ==================== 公共组件样式 ==================== */
+
+/* 卡片基础样式 */
+.card {
+  background: var(--color-bg-primary);
+  border-radius: 2px;
+  box-shadow: var(--shadow-md);
+  overflow: hidden;
+}
+
+.card-header {
+  padding: var(--spacing-lg);
+  border-bottom: 1px solid var(--color-border-secondary);
+}
+
+.card-body {
+  padding: var(--spacing-lg);
+}
+
+.card-footer {
+  padding: var(--spacing-lg);
+  border-top: 1px solid var(--color-border-secondary);
+  background: var(--color-bg-secondary);
+}
+
+/* 按钮基础样式 */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--spacing-xs);
+  padding: var(--spacing-sm) var(--spacing-lg);
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-medium);
+  border-radius: 2px;
+  cursor: pointer;
+  transition: all var(--transition-normal);
+}
+
+.btn:hover {
+  background: var(--color-bg-hover);
+}
+
+.btn-primary {
+  background: var(--color-primary);
+  color: white;
+}
+
+.btn-primary:hover {
+  background: var(--color-primary-hover);
+}
+
+/* 标签/徽章样式 */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2px 8px;
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  border-radius: 2px;
+}
+
+.badge-primary {
+  background: var(--color-primary-light);
+  color: var(--color-primary);
+}
+
+.badge-success {
+  background: var(--color-success-light);
+  color: var(--color-success);
+}
+
+.badge-warning {
+  background: var(--color-warning-light);
+  color: var(--color-warning);
+}
+
+.badge-danger {
+  background: var(--color-danger-light);
+  color: var(--color-danger);
+}
+
+/* 头像样式 */
+.avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-full);
+  background: var(--color-primary);
+  color: white;
+  font-weight: var(--font-weight-medium);
+}
+
+.avatar-sm { width: 24px; height: 24px; font-size: var(--font-size-sm); }
+.avatar-md { width: 32px; height: 32px; font-size: var(--font-size-base); }
+.avatar-lg { width: 40px; height: 40px; font-size: var(--font-size-md); }
+
+/* 空状态样式 */
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 60px 20px;
+  text-align: center;
+}
+
+.empty-icon {
+  font-size: 48px;
+  color: var(--color-text-placeholder);
+  margin-bottom: var(--spacing-lg);
+}
+
+.empty-title {
+  font-size: var(--font-size-2xl);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-primary);
+  margin-bottom: var(--spacing-sm);
+}
+
+.empty-description {
+  font-size: var(--font-size-md);
+  color: var(--color-text-tertiary);
+  max-width: 300px;
+  line-height: var(--line-height-normal);
+}
+
+/* 加载骨架屏动画 */
+@keyframes skeleton-loading {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+.skeleton {
+  background: #e8e8e8;
+  animation: skeleton-loading 1.5s ease-in-out infinite;
+}
+
+@keyframes skeleton-loading {
+  0% { opacity: 0.6; }
+  50% { opacity: 1; }
+  100% { opacity: 0.6; }
+}
+
+/* ==================== 滚动条样式 ==================== */
+
+.custom-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-border-light) transparent;
+}
+
+.custom-scrollbar::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+  border-radius: 2px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: var(--color-border-light);
+  border-radius: 2px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: var(--color-text-placeholder);
+}
+
+/* ==================== 表格公共样式 ==================== */
+
+.table-container {
+  width: 100%;
+  overflow-x: auto;
+}
+
+.table-header {
+  display: flex;
+  align-items: center;
+  padding: 14px 12px;
+  background: var(--color-bg-secondary);
+  border-bottom: 1px solid var(--color-border-primary);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-primary);
+}
+
+.table-row {
+  display: flex;
+  align-items: center;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--color-border-secondary);
+  transition: background var(--transition-fast);
+}
+
+.table-row:hover {
+  background: var(--color-bg-hover);
+}
+
+.table-cell {
+  padding: 0 12px;
+  font-size: var(--font-size-base);
+  color: var(--color-text-secondary);
+}
+
+/* ==================== 表单公共样式 ==================== */
+
+.form-group {
+  margin-bottom: var(--spacing-lg);
+}
+
+.form-label {
+  display: block;
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-text-primary);
+  margin-bottom: var(--spacing-sm);
+}
+
+.form-label .required {
+  color: var(--color-danger);
+  margin-left: 2px;
+}
+
+.form-label .optional {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-tertiary);
+  font-weight: var(--font-weight-normal);
+  margin-left: 4px;
+}
+
+.form-hint {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-tertiary);
+  margin-top: var(--spacing-xs);
+}
+
+.form-error {
+  font-size: var(--font-size-sm);
+  color: var(--color-danger);
+  margin-top: var(--spacing-xs);
+}
+
+/* ==================== Element Plus 选中状态文字颜色修正 ==================== */
+
+/* 下拉选项选中状态 - 保持文字可读 */
+.el-select-dropdown__item.is-selected {
+  color: var(--color-primary) !important;
+}
+
+/* 树形选择选中状态 */
+.el-tree-node.is-current > .el-tree-node__content {
+  color: var(--color-primary) !important;
+}
+
+/* 单选/多选按钮选中状态文字 */
+.el-radio-button.is-active .el-radio-button__inner,
+.el-checkbox.is-checked .el-checkbox__label {
+  color: inherit !important;
+}
+
+/* 标签页选中状态 */
+.el-tabs__item.is-active {
+  color: var(--color-primary) !important;
+}
+
+/* 菜单项选中状态 */
+.el-menu-item.is-active {
+  color: var(--color-primary) !important;
+}
+
+/* 输入框聚焦状态文字颜色保持 */
+.el-input__inner:focus,
+.el-textarea__inner:focus {
+  color: var(--color-text-primary) !important;
+}
+
+/* 按钮选中/聚焦状态文字保持白色（主色按钮，排除链接按钮） */
+.el-button--primary:not(.is-link).is-active,
+.el-button--primary:not(.is-link):active,
+.el-button--primary:not(.is-link):focus {
+  color: #FFFFFF !important;
+}

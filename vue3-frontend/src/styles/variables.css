@@ -1,0 +1,195 @@
+/**
+ * 设计令牌 - CSS 变量定义
+ * 统一管理颜色、间距、字体、圆角、阴影等设计元素
+ *
+ * 配色理念：黑白极简
+ * - 主色：纯黑，极致简约
+ * - 中性色：灰度层次，现代高级
+ * - 功能色：克制点缀，不喧宾夺主
+ */
+
+:root {
+  /* ==================== 颜色系统 ==================== */
+
+  /* 主色 - 纯黑 */
+  --color-primary: #18181B;
+  --color-primary-hover: #27272A;
+  --color-primary-light: #F4F4F5;
+  --color-primary-lighter: #FAFAFA;
+
+  /* 功能色 - 克制点缀 */
+  --color-success: #22C55E;
+  --color-success-light: #F0FDF4;
+  --color-warning: #EAB308;
+  --color-warning-light: #FEFCE8;
+  --color-danger: #EF4444;
+  --color-danger-light: #FEF2F2;
+  --color-info: #71717A;
+  --color-info-light: #FAFAFA;
+
+  /* 中性色 - 灰度层次 */
+  --color-text-primary: #18181B;
+  --color-text-secondary: #52525B;
+  --color-text-tertiary: #71717A;
+  --color-text-placeholder: #A1A1AA;
+  --color-text-disabled: #D4D4D8;
+
+  /* 背景色 */
+  --color-bg-primary: #FFFFFF;
+  --color-bg-secondary: #FAFAFA;
+  --color-bg-tertiary: #F4F4F5;
+  --color-bg-hover: #F4F4F5;
+  --color-bg-active: #E4E4E7;
+
+  /* 边框色 */
+  --color-border-primary: #E4E4E7;
+  --color-border-secondary: #F4F4F5;
+  --color-border-light: #D4D4D8;
+
+  /* ==================== Element Plus 主题覆盖 ==================== */
+  --el-color-primary: #18181B;
+  --el-color-primary-light-3: #52525B;
+  --el-color-primary-light-5: #71717A;
+  --el-color-primary-light-7: #A1A1AA;
+  --el-color-primary-light-8: #D4D4D8;
+  --el-color-primary-light-9: #F4F4F5;
+  --el-color-primary-dark-2: #09090B;
+
+  /* 选中状态文字颜色 - 保持深色确保可读性 */
+  --el-color-primary-light-3-text: #FFFFFF;
+  --el-color-primary-light-5-text: #FFFFFF;
+  --el-color-primary-light-7-text: #18181B;
+  --el-color-primary-light-8-text: #18181B;
+  --el-color-primary-light-9-text: #18181B;
+
+  --el-color-success: #22C55E;
+  --el-color-success-light-3: #4ADE80;
+  --el-color-success-light-5: #86EFAC;
+  --el-color-success-light-7: #BBF7D0;
+  --el-color-success-light-8: #DCFCE7;
+  --el-color-success-light-9: #F0FDF4;
+  --el-color-success-dark-2: #16A34A;
+
+  --el-color-warning: #EAB308;
+  --el-color-warning-light-3: #FACC15;
+  --el-color-warning-light-5: #FDE047;
+  --el-color-warning-light-7: #FEF08A;
+  --el-color-warning-light-8: #FEF9C3;
+  --el-color-warning-light-9: #FEFCE8;
+  --el-color-warning-dark-2: #CA8A04;
+
+  --el-color-danger: #EF4444;
+  --el-color-danger-light-3: #F87171;
+  --el-color-danger-light-5: #FCA5A5;
+  --el-color-danger-light-7: #FECACA;
+  --el-color-danger-light-8: #FEE2E2;
+  --el-color-danger-light-9: #FEF2F2;
+  --el-color-danger-dark-2: #DC2626;
+
+  --el-color-info: #71717A;
+  --el-color-info-light-3: #A1A1AA;
+  --el-color-info-light-5: #D4D4D8;
+  --el-color-info-light-7: #E4E4E7;
+  --el-color-info-light-8: #F4F4F5;
+  --el-color-info-light-9: #FAFAFA;
+  --el-color-info-dark-2: #52525B;
+
+  --el-text-color-primary: #18181B;
+  --el-text-color-regular: #52525B;
+  --el-text-color-secondary: #71717A;
+  --el-text-color-placeholder: #A1A1AA;
+  --el-text-color-disabled: #D4D4D8;
+
+  --el-bg-color: #FFFFFF;
+  --el-bg-color-page: #FAFAFA;
+  --el-bg-color-overlay: #FFFFFF;
+
+  --el-border-color: #E4E4E7;
+  --el-border-color-light: #F4F4F5;
+  --el-border-color-lighter: #FAFAFA;
+  --el-border-color-extra-light: #FFFFFF;
+  --el-border-color-dark: #D4D4D8;
+
+  --el-fill-color: #F4F4F5;
+  --el-fill-color-light: #FAFAFA;
+  --el-fill-color-lighter: #FFFFFF;
+  --el-fill-color-blank: #FFFFFF;
+
+  /* Element Plus 圆角统一 */
+  --el-border-radius-base: 2px;
+  --el-border-radius-small: 2px;
+  --el-border-radius-round: 2px;
+  --el-border-radius-circle: 50%;
+
+  /* ==================== 间距系统 ==================== */
+  --spacing-xs: 4px;
+  --spacing-sm: 8px;
+  --spacing-md: 12px;
+  --spacing-lg: 16px;
+  --spacing-xl: 20px;
+  --spacing-2xl: 24px;
+  --spacing-3xl: 32px;
+
+  /* ==================== 字体系统 ==================== */
+  --font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  --font-family-mono: 'SF Mono', 'Monaco', 'Inconsolata', 'Fira Mono', monospace;
+
+  --font-size-xs: 11px;
+  --font-size-sm: 12px;
+  --font-size-base: 13px;
+  --font-size-md: 14px;
+  --font-size-lg: 15px;
+  --font-size-xl: 16px;
+  --font-size-2xl: 18px;
+  --font-size-3xl: 20px;
+  --font-size-4xl: 24px;
+
+  --font-weight-normal: 400;
+  --font-weight-medium: 500;
+  --font-weight-semibold: 600;
+  --font-weight-bold: 700;
+
+  --line-height-tight: 1.25;
+  --line-height-normal: 1.5;
+  --line-height-relaxed: 1.6;
+
+  /* ==================== 圆角系统 ==================== */
+  --radius-sm: 2px;
+  --radius-md: 2px;
+  --radius-lg: 2px;
+  --radius-xl: 2px;
+  --radius-2xl: 2px;
+  --radius-full: 9999px;
+
+  /* ==================== 阴影系统 ==================== */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 2px 8px rgba(0, 0, 0, 0.08);
+  --shadow-lg: 0 4px 16px rgba(0, 0, 0, 0.12);
+  --shadow-xl: 0 8px 24px rgba(0, 0, 0, 0.16);
+
+  /* ==================== 过渡动画 ==================== */
+  --transition-fast: 0.15s ease;
+  --transition-normal: 0.2s ease;
+  --transition-slow: 0.3s ease;
+
+  /* ==================== 层级系统 ==================== */
+  --z-dropdown: 1000;
+  --z-sticky: 1020;
+  --z-fixed: 1030;
+  --z-modal-backdrop: 1040;
+  --z-modal: 1050;
+  --z-popover: 1060;
+  --z-tooltip: 1070;
+
+  /* ==================== 布局尺寸 ==================== */
+  --sidebar-width: 260px;
+  --header-height: 56px;
+  --toolbar-height: 48px;
+}
+
+/* 深色主题变量（预留） */
+@media (prefers-color-scheme: dark) {
+  :root {
+    /* 可在此添加深色主题变量覆盖 */
+  }
+}

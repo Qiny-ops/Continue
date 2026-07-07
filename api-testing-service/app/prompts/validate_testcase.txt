@@ -1,0 +1,86 @@
+你是一位 API 测试流程校验专家。根据测试用例的整体预期和所有接口的执行结果，校验整个测试流程是否符合预期。
+
+测试用例信息：
+- 用例 ID: {{case_id}}
+- 接口名称：{{api_name}}
+- 前置条件：{{precondition}}
+- 测试点：{{testpoint}}
+- 预期结果：{{expectation}}
+
+执行结果列表：
+{{execution_results}}
+
+## 校验规则
+
+### 1. 状态码判断（非常重要）
+每个接口的执行结果中包含 expected_status（预期状态码）和实际 status_code，必须对比判断：
+
+- **正常场景**（expected_status 为 200、201 等 2xx）：实际状态码必须精确匹配
+- **错误场景**（expected_status 为 400、401、403、404、500 等 4xx/5xx）：
+  - 实际返回同类型状态码算通过（如预期401实际403，都是4XX，系统正确拒绝了请求）
+  - 实际返回200算失败（系统没拒绝非法请求，是bug）
+  - 预期401实际404也算通过（都是4XX，URL可能因路径参数导致路由不同，但系统确实拒绝了请求）
+- **通配符**（expected_status 为 "4XX"、"5XX"）：匹配对应范围
+
+判断公式：如果 expected_status 是 4xx 或 5xx，实际 status_code 也是 4xx 或 5xx → 该接口通过
+
+### 2. 跨接口数据一致性
+- 注册接口返回的用户ID，是否与后续接口使用的ID一致
+- 登录接口返回的token，是否被正确用于后续认证接口
+- 创建接口返回的资源ID，是否在查询/更新/删除接口中被正确引用
+
+### 3. Cookie 认证一致性
+- 登录接口响应的 Set-Cookie（如 sessionid、csrftoken），是否在后续接口请求中被正确携带
+- 如果登录接口返回了 sessionid Cookie，后续需要认证的接口请求中应包含该 Cookie
+- 执行结果中的 cookies 字段记录了每个接口响应返回的 Cookie，可用于校验
+
+### 4. 整体业务逻辑
+- 测试点描述的业务场景是否完整走通
+- 前置条件是否满足（如"已登录用户"是否真的获取到了token或sessionid）
+- 预期结果是否从业务角度达成
+
+### 5. 可跳过的错误
+- 如果注册接口返回"用户已存在"但后续登录成功，不影响整体流程判断
+
+## 输出格式
+
+直接输出 JSON，不要用 markdown 包裹：
+
+{"passed": true或false, "reason": "整体流程校验结论", "flow_checks": [{"item": "校验项", "result": "pass或fail", "detail": "说明"}]}
+
+## 要求
+1. 必须根据 expected_status 判断每个接口是否通过，不要仅凭 HTTP 2xx 判断
+2. 错误场景测试（预期4xx/5xx）返回同类型状态码是正确的，不是失败
+3. 重点关注数据在接口间是否正确传递和使用（包括 Token 和 Cookie）
+4. 直接输出JSON，不要用markdown包裹
+5. reason 要简洁，不超过150字
+
+## 失败分析要求
+
+如果整体校验结果为 passed: false，必须额外输出 failure_analysis 字段：
+
+- root_cause: 失败的根本原因（如参数错误、认证失败、接口依赖断裂等）
+- affected_interfaces: 影响的接口名称列表
+- suggestions: 具体的修改建议数组，每条包含 type 和 description
+  - type 可选值：参数修改、认证问题、接口配置、测试数据、其他
+- debug_steps: 排查步骤数组
+
+示例：
+{
+  "passed": false,
+  "reason": "登录接口返回 401，后续认证接口无法执行",
+  "flow_checks": [{"item": "登录接口", "result": "fail", "detail": "状态码 401"}],
+  "failure_analysis": {
+    "root_cause": "登录接口请求参数错误，密码字段为空导致认证失败",
+    "affected_interfaces": ["用户登录"],
+    "suggestions": [
+      {"type": "参数修改", "description": "确保登录请求的 request_body 包含 username 和 password 字段"},
+      {"type": "测试数据", "description": "检查测试数据中是否配置了正确的用户名和密码"}
+    ],
+    "debug_steps": [
+      "检查登录接口的 request_body 是否包含密码",
+      "确认测试数据中的用户名和密码是否正确",
+      "检查后端是否正确接收了密码参数"
+    ]
+  }
+}

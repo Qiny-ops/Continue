@@ -1,0 +1,33 @@
+version: '3.8'
+
+services:
+  api:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      - MODEL_API_KEY=${MODEL_API_KEY:-EMPTY}
+      - MODEL_BASE_URL=${MODEL_BASE_URL:-http://120.209.70.202:31389/v1}
+      - MAX_TOKENS=${MAX_TOKENS:-81920}
+      - MAX_RETRIES=${MAX_RETRIES:-3}
+      - RETRY_DELAY=${RETRY_DELAY:-2.0}
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  # Redis（可选，用于分布式部署）
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    profiles:
+      - distributed
+
+volumes:
+  redis_data:

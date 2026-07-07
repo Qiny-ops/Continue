@@ -1,0 +1,43 @@
+// 处理SSE事件
+const handleEvent = (event) => {
+  const { type, data } = event
+  console.log('收到事件:', type, data)
+
+  switch (type) {
+    case 'parsed':
+      status.value = 'running'
+      parsedOperations.value = data.operations || []
+      ElMessage.success(`解析成功：${data.operations_count} 个操作`)
+      break
+
+    case 'step':
+      // 执行步骤结果
+      if (data.seq && data.action) {
+        const existingIndex = executedSteps.value.findIndex(s => s.seq === data.seq)
+        if (existingIndex >= 0) {
+          executedSteps.value[existingIndex] = data
+        } else {
+          executedSteps.value.push(data)
+        }
+      } else if (data.message) {
+        console.log('进度消息:', data.message)
+      }
+      break
+
+    case 'assertion':
+      console.log('断言结果:', data)
+      break
+
+    case 'complete':
+      executing.value = false
+      status.value = data.success ? 'success' : 'error'
+      ElMessage.success(data.message || '执行完成')
+      break
+
+    case 'error':
+      executing.value = false
+      status.value = 'error'
+      ElMessage.error(data.message || '执行失败')
+      break
+  }
+}
