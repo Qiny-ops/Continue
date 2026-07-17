@@ -161,6 +161,7 @@ class TestExecutionEngine:
                         "request": result.request,
                         "response": result.response,
                         "status_code": result.status_code,
+                        "expected_status": result.expected_status,
                         "success": result.success,
                         "duration_ms": result.duration_ms,
                         "error": result.error,
@@ -637,22 +638,6 @@ class TestExecutionEngine:
         except Exception as e:
             logger.error(f"提取变量失败: path={path}, error={e}")
             return None
-        """从 run_list 中提取需要清理的时间戳格式测试用户名"""
-        usernames = []
-        pattern = r'^test_\d{8}_\d{6}_[a-z0-9]{4}$'
-
-        for api_info in run_list:
-            api_name = api_info.get("api_name", "")
-            if "注册" not in api_name:
-                continue
-
-            request_body = api_info.get("request_body", {})
-            if isinstance(request_body, dict):
-                username = request_body.get("username", "")
-                if re.match(pattern, username):
-                    usernames.append(username)
-
-        return usernames
 
     async def validate_testcase(
         self,
@@ -750,58 +735,41 @@ class TestExecutionEngine:
 
     def _enhance_execution_results(self, results: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         """
-        增强 execution_results，确保每个结果包含 expected_status 和判定说明。
+        增强 execution_results，为每个结果添加事实性判定说明，辅助 AI 校验。
 
-        前端传来的 execution_results 可能缺少 expected_status，
-        导致AI无法判断错误场景测试是否通过。
+        expected_status 由执行阶段传入，不再做关键词推断。
+        status_judgment 只陈述事实（预期值、实际值、是否匹配），判断交给 AI。
         """
         enhanced = []
         for r in results:
             item = dict(r)
 
-            # 如果已有 expected_status，直接使用
-            if "expected_status" not in item:
-                # 尝试从 description 推断
-                desc = item.get("description", "")
-                api_name = item.get("api_name", "")
-
-                # 根据 description 中的关键词推断
-                if any(kw in desc for kw in ["预期返回401", "无权限", "未授权"]):
-                    item["expected_status"] = 401
-                elif any(kw in desc for kw in ["预期返回403", "禁止"]):
-                    item["expected_status"] = 403
-                elif any(kw in desc for kw in ["预期返回404", "不存在"]):
-                    item["expected_status"] = 404
-                elif any(kw in desc for kw in ["预期返回400", "参数错误"]):
-                    item["expected_status"] = 400
-                elif "注册" in api_name:
-                    item["expected_status"] = 201
-                elif "登录" in api_name:
-                    item["expected_status"] = 200
-                else:
-                    item["expected_status"] = 200
-
-            # 为每个结果添加判定说明，帮助AI理解
             expected = item.get("expected_status")
             actual = item.get("status_code")
 
-            if expected and actual:
+            if expected is not None and actual is not None:
                 try:
-                    exp_int = int(str(expected).rstrip("Xx"))
+                    exp_str = str(expected).upper()
                     act_int = actual
-                    is_error_test = exp_int >= 400
-                    same_category = (exp_int // 100) == (act_int // 100)
 
-                    if is_error_test and same_category:
-                        item["status_judgment"] = f"错误场景测试通过：预期{expected}(错误场景)，实际{actual}(同类型错误码)，系统正确拒绝了请求"
-                    elif str(expected).upper().endswith("XX") and same_category:
-                        item["status_judgment"] = f"通配符匹配通过：预期{expected}，实际{actual}，匹配成功"
-                    elif str(expected) == str(actual):
-                        item["status_judgment"] = f"状态码精确匹配：预期{expected}，实际{actual}"
+                    if exp_str.endswith("XX"):
+                        base = int(exp_str[0]) * 100
+                        matched = base <= act_int < base + 100
+                    elif "-" in exp_str:
+                        parts = exp_str.split("-")
+                        matched = int(parts[0]) <= act_int <= int(parts[1])
                     else:
-                        item["status_judgment"] = f"状态码不匹配：预期{expected}，实际{actual}"
+                        exp_int = int(exp_str.rstrip("Xx"))
+                        if 400 <= exp_int < 600:
+                            matched = (exp_int // 100) == (act_int // 100)
+                        else:
+                            matched = exp_int == act_int
+
+                    item["status_judgment"] = (
+                        f"预期状态码{expected}，实际{actual}，{'匹配' if matched else '不匹配'}"
+                    )
                 except (ValueError, TypeError):
-                    pass
+                    item["status_judgment"] = f"预期状态码{expected}，实际{actual}"
 
             enhanced.append(item)
 

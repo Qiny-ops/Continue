@@ -233,7 +233,8 @@ class ApiTestCaseViewSet(viewsets.ModelViewSet):
                             test_case.save(update_fields=['status'])
 
                             # 发送包含完整执行结果的 report 事件
-                            yield f"data: {json.dumps({'type': 'report', 'data': {'passed': all_success, 'result': run.result, 'duration_ms': total_ms, 'step_count': len(step_results)}}, ensure_ascii=False)}\n\n"
+                            success_count = sum(1 for s in step_results if s.get("success", False))
+                            yield f"data: {json.dumps({'type': 'report', 'data': {'passed': all_success, 'success': success_count, 'total': len(step_results), 'result': run.result, 'duration_ms': total_ms, 'step_count': len(step_results)}}, ensure_ascii=False)}\n\n"
 
                         elif event_type == "error":
                             run.result = 'error'
