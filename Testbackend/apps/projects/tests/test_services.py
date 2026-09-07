@@ -1,83 +1,72 @@
 """
 项目模块 - 测试
 
-包含项目模块的单元测试和集成测试。
+全部使用异常风格：Service 方法失败时抛出 BaseAPIException 子类，
+由 DRF 异常处理器统一转为 HTTP 响应。成功时只返回数据（非元组）。
 """
 
 from django.test import TestCase
 from django.contrib.auth import get_user_model
 from apps.projects.services import ProjectService, ProjectMemberService
 from apps.projects.repositories import ProjectRepository, ProjectMemberRepository
+from apps.core.exceptions import BusinessError, ValidationError, NotFoundError, PermissionDenied
 
 User = get_user_model()
 
 
 class ProjectRepositoryTestCase(TestCase):
-    """项目 Repository 测试"""
+    """项目 Repository 测试（Repository 层不抛业务异常，仍保持原始行为）"""
 
     def setUp(self):
         self.user = User.objects.create_user(
-            username='testuser',
-            email='test@example.com',
-            password='testpass123',
-            name='Test User'
+            username='testreposvc', email='repo@test.com',
+            password='testpass123', name='Repo User'
         )
 
     def test_create_project(self):
-        """测试创建项目"""
-        project = ProjectRepository.create(
-            name='Test Project',
-            identifier='TEST001',
-            type='software',
-            owner=self.user
-        )
+        project = ProjectRepository.create_project(name='Test Project', code='test001', owner=self.user)
         self.assertEqual(project.name, 'Test Project')
-        self.assertEqual(project.identifier, 'TEST001')
+        self.assertEqual(project.code, 'test001')
 
     def test_get_by_identifier(self):
-        """测试根据标识符获取项目"""
-        project = ProjectRepository.create(
-            name='Test Project',
-            identifier='TEST002',
-            type='software',
-            owner=self.user
-        )
+        project = ProjectRepository.create_project(name='Test Project', code='test002', owner=self.user)
         found = ProjectRepository.get_by_identifier('TEST002')
+        self.assertIsNotNone(found)
         self.assertEqual(found.id, project.id)
 
 
 class ProjectServiceTestCase(TestCase):
-    """项目 Service 测试"""
+    """项目 Service 测试（异常风格）"""
 
     def setUp(self):
         self.user = User.objects.create_user(
-            username='testuser',
-            email='test@example.com',
-            password='testpass123',
-            name='Test User'
+            username='testproj', email='proj@test.com',
+            password='testpass123', name='Proj User'
         )
 
     def test_create_project_success(self):
-        """测试成功创建项目"""
-        project, error = ProjectService.create_project(self.user, {
-            'name': 'Test Project',
-            'identifier':TEST003',
-            'type': 'software'
+        project = ProjectService.create_project(self.user, {
+            'name': 'Test Project', 'code': 'test003', 'type': 'web'
         })
-        self.assertIsNone(error)
+        self.assertIsNotNone(project)
         self.assertEqual(project.name, 'Test Project')
 
-    def test_create_project_duplicate_identifier(self):
-        """测试创建重复标识符的项目"""
-        ProjectService.create_project(self.user, {
-            'name': 'Project 1',
-            'identifier': 'TEST004'
-        })
-        project, error = ProjectService.create_project(self.user, {
-            'name': 'Project 2',
-            'identifier': 'TEST004'
-        })
-        self.assertIsNotNone(error)
+    def test_create_project_missing_name(self):
+        with self.assertRaises(ValidationError):
+            ProjectService.create_project(self.user, {'code': 'test'})
+
+    def test_create_project_missing_code(self):
+        with self.assertRaises(ValidationError):
+            ProjectService.create_project(self.user, {'name': 'test'})
+
+    def test_create_project_invalid_type(self):
+        with self.assertRaises(ValidationError):
+            ProjectService.create_project(self.user, {'name': 'test', 'code': 't01', 'type': 'software'})
+
+    def test_create_project_duplicate_code(self):
+        ProjectService.create_project(self.user, {'name': 'P1', 'code': 'test004'})
+        with self.assertRaises(BusinessError):
+            ProjectService.create_project(self.user, {'name': 'P2', 'code': 'test004'})
 
 
 class ProjectMemberServiceTestCase(TestCase):
@@ -85,38 +74,24 @@ class ProjectMemberServiceTestCase(TestCase):
 
     def setUp(self):
         self.owner = User.objects.create_user(
-            username='owner',
-            email='owner@example.com',
-            password='testpass123',
-            name='Owner'
+            username='owner2', email='owner2@test.com',
+            password='testpass123', name='Owner'
         )
         self.member = User.objects.create_user(
-            username='member',
-            email='member@example.com',
-            password='testpass123',
-            name='Member'
+            username='member2', email='member2@test.com',
+            password='testpass123', name='Member'
         )
-        self.project, _ = ProjectService.create_project(self.owner, {
-            'name': 'Test Project',
-            'identifier': 'TEST005'
+        self.project = ProjectService.create_project(self.owner, {
+            'name': 'Test Project', 'code': 'test005'
         })
 
     def test_add_member(self):
-        """测试添加成员"""
-        member_data, error = ProjectMemberService.add_member(
-            project_identifier='TEST005',
-            operator=self.owner,
-            user_id=self.member.id,
-            role='viewer'
+        member_data = ProjectMemberService.add_member(
+            project_identifier='test005', operator=self.owner,
+            user_id=self.member.id, role='viewer'
         )
-        self.assertIsNone(error)
-        self.assertEqual(member_data['username'], 'member')
+        self.assertEqual(member_data['name'], 'Member')
 
     def test_toggle_favorite(self):
-        """测试切换收藏状态"""
-        is_favorite, error = ProjectMemberService.toggle_favorite(
-            'TEST005',
-            self.owner
-        )
-        self.assertIsNone(error)
+        is_favorite = ProjectMemberService.toggle_favorite('test005', self.owner)
         self.assertTrue(is_favorite)

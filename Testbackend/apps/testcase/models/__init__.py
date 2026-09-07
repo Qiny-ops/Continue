@@ -10,7 +10,8 @@ from .test_case import (
     TestModule,
     TestCase,
     TestCaseReview,
-    TestCaseExecution
+    TestCaseExecution,
+    AIGenerationRecord
 )
 
 __all__ = [
@@ -19,5 +20,6 @@ __all__ = [
     'TestModule',
     'TestCase',
     'TestCaseReview',
-    'TestCaseExecution'
+    'TestCaseExecution',
+    'AIGenerationRecord'
 ]

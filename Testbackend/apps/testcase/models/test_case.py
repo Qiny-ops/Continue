@@ -20,8 +20,6 @@ class TestCaseRepository(models.Model):
     project = models.ForeignKey(
         Project,
         on_delete=models.CASCADE,
-        null=True,
-        blank=True,
         related_name='test_repositories',
         verbose_name='所属项目'
     )
@@ -50,16 +48,21 @@ class TestCaseRepository(models.Model):
         return self.name
 
     def save(self, *args, **kwargs):
-        """保存时验证项目是否为空"""
+        """确保每个项目只有一个默认用例库，且项目不为空"""
         if not self.project_id:
             raise ValueError('用例库必须关联项目')
+        if self.is_default and self.project_id:
+            TestCaseRepository.objects.filter(
+                project_id=self.project_id, is_default=True
+            ).exclude(pk=self.pk).update(is_default=False)
         super().save(*args, **kwargs)
 
 
 class TestCaseVersion(models.Model):
     """
     版本模型
-    用例库的不同版本对应存放被测应用的不同版本的测试用例
+    版本属于用例库，通过用例库归属项目。
+    需求和用例都通过版本关联，共享同一模块体系。
     """
     STATUS_CHOICES = [
         ('active', '活跃'),
@@ -209,9 +212,12 @@ class TestCase(models.Model):
         blank=True,
         verbose_name='关联的自动化用例ID'
     )
-    requirement = models.CharField(
-        max_length=500,
+    requirement = models.ForeignKey(
+        'requirement.Requirement',
+        on_delete=models.SET_NULL,
+        null=True,
         blank=True,
+        related_name='test_cases',
         verbose_name='关联需求'
     )
     precondition = models.TextField(blank=True, verbose_name='前置条件')
@@ -234,27 +240,12 @@ class TestCase(models.Model):
     created_at = models.DateTimeField(auto_now_add=True, verbose_name='创建时间')
     updated_at = models.DateTimeField(auto_now=True, verbose_name='更新时间')
 
-    # AI生成相关字段
+    # 来源
     generation_source = models.CharField(
         max_length=20,
         choices=GENERATION_SOURCE_CHOICES,
         default='manual',
         verbose_name='生成来源'
-    )
-    ai_request_id = models.CharField(
-        max_length=100,
-        blank=True,
-        verbose_name='AI请求ID'
-    )
-    ai_model_version = models.CharField(
-        max_length=50,
-        blank=True,
-        verbose_name='AI模型版本'
-    )
-    ai_confidence = models.FloatField(
-        null=True,
-        blank=True,
-        verbose_name='AI置信度'
     )
     review_status = models.CharField(
         max_length=20,
@@ -280,6 +271,24 @@ class TestCase(models.Model):
 
     def __str__(self):
         return self.title
+
+    def save(self, *args, **kwargs):
+        """保证用例所属版本与所在模块版本一致，防止产生跨版本的"幽灵用例"。
+
+        当用例归属某个模块时，强制将其 version 同步为模块的 version：
+        - 仅设置 module 而未设置 version 时，自动从模块派生 version；
+        - module 与 version 不一致时，以 module 的版本为准（模块树统计/按版本查询依赖这一约束）。
+        """
+        if self.module_id:
+            try:
+                module = TestModule.objects.get(id=self.module_id)
+                if module.version_id and (
+                    not self.version_id or self.version_id != module.version_id
+                ):
+                    self.version = module.version
+            except TestModule.DoesNotExist:
+                pass
+        super().save(*args, **kwargs)
 
 
 class TestCaseReview(models.Model):
@@ -399,3 +408,114 @@ class TestCaseExecution(models.Model):
 
     def __str__(self):
         return f"{self.test_case.title} - {self.get_result_display()}"
+
+
+class AIGenerationRecord(models.Model):
+    """
+    AI生成记录模型
+
+    存储AI生成测试用例的元数据，与TestCase解耦。
+    """
+    STATUS_CHOICES = [
+        ('pending', '待处理'),
+        ('processing', '处理中'),
+        ('completed', '已完成'),
+        ('failed', '失败'),
+    ]
+
+    # 关联
+    test_case = models.ForeignKey(
+        TestCase,
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name='ai_generation_records',
+        verbose_name='关联用例'
+    )
+    version = models.ForeignKey(
+        TestCaseVersion,
+        on_delete=models.CASCADE,
+        related_name='ai_generation_records',
+        verbose_name='所属版本'
+    )
+    module = models.ForeignKey(
+        TestModule,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='ai_generation_records',
+        verbose_name='所属模块'
+    )
+
+    # 生成参数
+    knowledge_base_ids = models.JSONField(
+        default=list, verbose_name='知识库ID列表'
+    )
+    knowledge_ids = models.JSONField(
+        default=list, verbose_name='知识文档ID列表'
+    )
+    module_name = models.CharField(
+        max_length=255, blank=True, verbose_name='模块名称'
+    )
+    func_point = models.CharField(
+        max_length=500, blank=True, verbose_name='功能点'
+    )
+    test_type = models.CharField(
+        max_length=50, blank=True, verbose_name='测试类型'
+    )
+
+    # AI 元数据
+    ai_request_id = models.CharField(
+        max_length=100, blank=True, verbose_name='AI请求ID'
+    )
+    ai_model_version = models.CharField(
+        max_length=50, blank=True, verbose_name='AI模型版本'
+    )
+    ai_confidence = models.FloatField(
+        null=True, blank=True, verbose_name='AI置信度'
+    )
+    ai_raw_result = models.JSONField(
+        default=dict, blank=True, verbose_name='AI原始返回'
+    )
+    ai_prompt_tokens = models.IntegerField(
+        null=True, blank=True, verbose_name='Prompt Token数'
+    )
+    ai_completion_tokens = models.IntegerField(
+        null=True, blank=True, verbose_name='Completion Token数'
+    )
+
+    # 结果
+    status = models.CharField(
+        max_length=20,
+        choices=STATUS_CHOICES,
+        default='pending',
+        verbose_name='状态'
+    )
+    cases_created_count = models.IntegerField(
+        default=0, verbose_name='创建用例数'
+    )
+    error_message = models.TextField(blank=True, verbose_name='错误信息')
+
+    # 审计
+    created_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        related_name='ai_generation_records',
+        verbose_name='创建者'
+    )
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name='创建时间')
+    updated_at = models.DateTimeField(auto_now=True, verbose_name='更新时间')
+
+    class Meta:
+        verbose_name = 'AI生成记录'
+        verbose_name_plural = 'AI生成记录管理'
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['version', 'status']),
+            models.Index(fields=['test_case']),
+            models.Index(fields=['created_by']),
+        ]
+
+    def __str__(self):
+        return f"AI生成 - {self.func_point or self.module_name} ({self.get_status_display()})"

@@ -1,0 +1,420 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>产品需求文档 — AI 驱动测试管理平台</title>
+<style>
+:root {
+  --bg: #fff; --text: #2c3e50; --text-secondary: #5a6a7e;
+  --border: #e2e8f0; --accent: #667eea; --accent-light: #eef0ff;
+  --card-shadow: 0 1px 3px rgba(0,0,0,.08);
+  --code-bg: #f7fafc; --domain-1: #667eea; --domain-2: #e67e22; --domain-3: #27ae60;
+  --domain-4: #e74c3c; --domain-5: #8e44ad; --domain-6: #16a085;
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; color:var(--text); background:var(--bg); line-height:1.7; }
+.container { max-width: 1200px; margin:0 auto; padding: 20px; }
+.header { background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%); color: #fff; padding: 60px 20px; text-align: center; }
+.header h1 { font-size: 2.4em; font-weight: 800; }
+.header .subtitle { color: #a8b2d1; font-size: 1.2em; margin-top: 8px; }
+.header .meta { margin-top: 16px; color: #8892b0; font-size: .85em; }
+.section { margin: 40px 0; }
+.section h2 { font-size: 1.6em; color: #1a1a2e; border-bottom: 3px solid var(--accent); padding-bottom: 8px; margin-bottom: 20px; }
+.section h3 { font-size: 1.2em; color: #34495e; margin: 28px 0 14px; padding-left: 12px; border-left: 3px solid var(--accent); }
+.domain-card { border: 1px solid var(--border); border-radius: 10px; padding: 20px 24px; margin: 16px 0; box-shadow: var(--card-shadow); }
+.domain-card .domain-header { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
+.domain-card .domain-icon { width: 40px; height: 40px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 1.2em; color: #fff; }
+.domain-card .domain-name { font-size: 1.15em; font-weight: 700; }
+.feature-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+@media (max-width: 768px) { .feature-grid { grid-template-columns: 1fr; } }
+.feature-item { padding: 8px 12px; background: var(--accent-light); border-radius: 6px; font-size: .9em; }
+.summary-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin: 24px 0; }
+.summary-card { border-radius: 10px; padding: 16px; box-shadow: var(--card-shadow); border: 1px solid var(--border); text-align: center; }
+.summary-card .count { font-size: 2em; font-weight: 800; color: var(--accent); }
+.summary-card .label { font-size: .85em; color: var(--text-secondary); margin-top: 4px; }
+.arch-block { background: #f8fafc; border: 1px solid var(--border); border-radius: 8px; padding: 16px 20px; margin: 8px 0; }
+.arch-block .arch-title { font-weight: 700; color: var(--accent); margin-bottom: 6px; }
+.entity-tree { font-family: 'SF Mono', 'Consolas', monospace; font-size: .85em; line-height: 1.8; padding: 12px; background: var(--code-bg); border-radius: 6px; border: 1px solid var(--border); white-space: pre; }
+table { width: 100%; border-collapse: collapse; margin: 16px 0; }
+th, td { padding: 8px 12px; text-align: left; border-bottom: 1px solid var(--border); font-size: .88em; }
+th { background: #f8fafc; font-weight: 700; }
+tr:hover { background: #f8fafc; }
+.perm-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.perm-tag { padding: 4px 8px; background: #e8f4fd; border-radius: 4px; font-size: .8em; font-family: monospace; }
+@media (max-width: 768px) { .perm-grid { grid-template-columns: 1fr 1fr; } }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>产品需求文档</h1>
+  <div class="subtitle">AI 驱动的软件测试管理平台 (TestFlow)</div>
+  <div class="meta">编制日期: 2026-08-06 &nbsp;|&nbsp; 数据来源: 全项目代码扫描（168个API / 26个前端页面 / 2个微服务 / 6个Django App）</div>
+</div>
+
+<div class="container">
+
+<div class="summary-cards">
+  <div class="summary-card"><div class="count">6</div><div class="label">功能域</div></div>
+  <div class="summary-card"><div class="count">168</div><div class="label">API 端点</div></div>
+  <div class="summary-card"><div class="count">26</div><div class="label">前端页面</div></div>
+  <div class="summary-card"><div class="count">15</div><div class="label">数据模型</div></div>
+  <div class="summary-card"><div class="count">2</div><div class="label">AI 微服务</div></div>
+  <div class="summary-card"><div class="count">6+6</div><div class="label">MCP工具 + SSE流</div></div>
+</div>
+
+<!-- ============================ SECTION 1: Overview ============================ -->
+<div class="section">
+<h2>1. 产品概述</h2>
+
+<p><strong>TestFlow</strong> 是一个 AI 增强的软件测试管理平台，覆盖从需求提取、测试用例设计、接口测试执行到质量评审的完整测试生命周期。核心能力：</p>
+<ul style="margin:12px 0 12px 20px; line-height:2;">
+  <li><strong>AI 原生</strong>：知识库驱动的测试用例自动生成、接口依赖分析、测试数据填充、执行结果校验</li>
+  <li><strong>多项目协作</strong>：项目级 RBAC 权限、成员管理、数据隔离</li>
+  <li><strong>完整测试链</strong>：需求管理 → 用例设计 → 用例评审 → 接口执行 → 结果校验</li>
+  <li><strong>双引擎架构</strong>：AI 推理引擎（用例生成）+ 接口测试引擎（执行/校验），通过 MCP 协议供 AI Agent 调用</li>
+</ul>
+
+<h3>1.1 技术架构</h3>
+<div class="arch-block" style="font-family: monospace; font-size: .85em; line-height: 1.8;">
+┌──────────────────────┐
+│   Vue3 前端 (5173)    │  ← 用户交互界面
+└────────┬─────────────┘
+         │ REST API (JWT Auth)
+┌────────▼─────────────┐
+│  Django Testbackend   │  ← 主业务后端 (8000)
+│  (6 apps / 168 API)   │
+└──┬────────┬──────────┘
+   │        │
+   │   ┌────▼──────────────┐
+   │   │ AI Generator       │  ← 本地 LLM 推理 (8001)
+   │   │ (FastAPI / MCP)    │     用例生成 / 批量推理
+   │   └───────────────────┘
+   │
+   └───►┌───────────────────┐
+        │ API Testing        │  ← 接口测试引擎 (8002)
+        │ (FastAPI / MCP)    │     6步测试管道 / SSE流式
+        └───────┬───────────┘
+                │
+        ┌───────▼───────────┐
+        │ WeKnora 知识库     │  ← 外部知识库 / RAG检索
+        └───────────────────┘
+</div>
+</div>
+
+<!-- ============================ SECTION 2: Functional Domains ============================ -->
+<div class="section">
+<h2>2. 功能域总览</h2>
+
+<!-- Domain 1 -->
+<div class="domain-card">
+<div class="domain-header">
+  <div class="domain-icon" style="background:var(--domain-1);">👤</div>
+  <div class="domain-name">2.1 用户认证与权限管理</div>
+</div>
+<h3>核心功能</h3>
+<div class="feature-grid">
+  <div class="feature-item">JWT Token 登录 / 注册 / 登出 / 刷新</div>
+  <div class="feature-item">邮箱找回密码（加密签名 Token）</div>
+  <div class="feature-item">Token 黑名单（登出即失效）</div>
+  <div class="feature-item">防暴力破解（IP 跟踪 + 限流）</div>
+  <div class="feature-item">系统角色管理（CRUD + 权限分配）</div>
+  <div class="feature-item">系统权限管理（CRUD + 权限矩阵）</div>
+  <div class="feature-item">用户 CRUD（列表/搜索/详情/编辑/删除/批量删除）</div>
+  <div class="feature-item">用户状态管理（启用/禁用/挂起）</div>
+  <div class="feature-item">个人资料（头像上传/邮箱验证/密码修改）</div>
+  <div class="feature-item">当前用户权限实时查询</div>
+  <div class="feature-item">数据转移（删除用户时迁移关联数据）</div>
+  <div class="feature-item">反向代理感知 IP 提取</div>
+</div>
+<h3>权限体系（三层）</h3>
+<div class="perm-grid">
+  <div class="perm-tag">system_admin</div><div class="perm-tag">user_manage</div><div class="perm-tag">user_view</div>
+  <div class="perm-tag">role_manage</div><div class="perm-tag">role_view</div><div class="perm-tag">project_create</div>
+  <div class="perm-tag">system_settings</div><div class="perm-tag">project_settings</div><div class="perm-tag">project_delete</div>
+</div>
+<p style="margin-top: 8px; font-size: .85em; color: var(--text-secondary);">
+  项目级 12 类权限：project_manage / member_view / member_manage / role_manage / repository_manage / testcase_view / testcase_create / testcase_edit / testcase_delete / testcase_review / apitest_execute / apitest_settings
+</p>
+</div>
+
+<!-- Domain 2 -->
+<div class="domain-card">
+<div class="domain-header">
+  <div class="domain-icon" style="background:var(--domain-2);">📁</div>
+  <div class="domain-name">2.2 项目管理</div>
+</div>
+<h3>核心功能</h3>
+<div class="feature-grid">
+  <div class="feature-item">项目 CRUD（创建/编辑/删除/归档）</div>
+  <div class="feature-item">项目列表（卡片/表格双视图 + 搜索 + 分页）</div>
+  <div class="feature-item">工作台（项目统计/最近访问/待办事项）</div>
+  <div class="feature-item">项目收藏 / 取消收藏</div>
+  <div class="feature-item">项目动态（活动日志聚合：用例库/版本/用例/执行）</div>
+  <div class="feature-item">成员管理（添加/编辑/移除/批量更新/角色分配）</div>
+  <div class="feature-item">自定义项目角色（创建/编辑/权限分配/颜色标识）</div>
+  <div class="feature-item">项目知识库（创建/关联/解除关联）</div>
+  <div class="feature-item">项目统计（按类型/状态/数量）</div>
+  <div class="feature-item">项目图标 + 颜色自定义</div>
+</div>
+<h3>数据模型</h3>
+<div class="entity-tree">
+Project (name, code, type, status, visibility, icon, icon_color, knowledge_base_id)
+  ├── ProjectMember (user, role, status, is_favorite)  [unique: project+user]
+  └── ProjectRole (role_key, name, color, permissions)
+</div>
+</div>
+
+<!-- Domain 3 -->
+<div class="domain-card">
+<div class="domain-header">
+  <div class="domain-icon" style="background:var(--domain-3);">🧪</div>
+  <div class="domain-name">2.3 测试用例管理</div>
+</div>
+<h3>核心功能</h3>
+<div class="feature-grid">
+  <div class="feature-item">四级组织：项目 → 用例库 → 版本 → 模块（树形）</div>
+  <div class="feature-item">用例库 CRUD（创建/编辑/设为默认/删除）</div>
+  <div class="feature-item">版本管理（创建/编辑/设为默认/归档/激活）</div>
+  <div class="feature-item">模块树（无限嵌套/增删改/排序/批量删除）</div>
+  <div class="feature-item">用例 CRUD（创建/编辑/详情/删除/复制）</div>
+  <div class="feature-item">批量操作（移动/复制/删除/更新属性）</div>
+  <div class="feature-item">多维度筛选（版本/模块/优先级/状态/搜索）</div>
+  <div class="feature-item">多轮评审（通过/驳回/修改后重审/评审历史链）</div>
+  <div class="feature-item">用例执行记录（创建/查询/统计）</div>
+  <div class="feature-item">导出（Excel / CSV）</div>
+  <div class="feature-item">关联需求（FK → Requirement）</div>
+  <div class="feature-item">AI 生成元数据解耦（AIGenerationRecord）</div>
+</div>
+<h3>数据模型</h3>
+<div class="entity-tree">
+TestCaseRepository (name, project, is_default*)
+  └── TestCaseVersion (name, status, is_default)
+        ├── TestModule (name, parent*, sort_order)  [树形自引用]
+        └── TestCase (title, priority, precondition, steps, expected_result,
+                      review_status, requirement*, module*, version)
+              ├── TestCaseReview (reviewer, status, comment,
+              │                    revision_number, revision_note, previous_review*)
+              └── TestCaseExecution (result, actual_result, executed_by)
+
+AIGenerationRecord (knowledge_base_ids, ai_confidence, tokens, ...)
+  └── TestCase (nullable FK)
+</div>
+<p style="margin-top: 8px; font-size: .85em; color: var(--text-secondary);">*is_default: save()覆盖自动保证每个项目/用例库只有1个默认</p>
+</div>
+
+<!-- Domain 4 -->
+<div class="domain-card">
+<div class="domain-header">
+  <div class="domain-icon" style="background:var(--domain-4);">🔌</div>
+  <div class="domain-name">2.4 接口测试管理</div>
+</div>
+<h3>核心功能</h3>
+<div class="feature-grid">
+  <div class="feature-item">多环境配置（开发/测试/预发布/生产 + 认证方式）</div>
+  <div class="feature-item">环境连接测试（HTTP HEAD 健康检查）</div>
+  <div class="feature-item">接口用例 CRUD（名称/apiname/前置/测试点/预期/数据/依赖）</div>
+  <div class="feature-item">SSE 流式执行（实时进度/步骤结果/断言/变量快照）</div>
+  <div class="feature-item">智能测试管道：依赖分析 → 数据填充 → 执行 → 校验</div>
+  <div class="feature-item">AI 校验（通过/失败判定 + 失败原因分析）</div>
+  <div class="feature-item">AI 从知识库生成接口用例</div>
+  <div class="feature-item">执行记录（结果/耗时/步骤详情/AI校验结果）</div>
+  <div class="feature-item">变量管理（提取/引用/占位符替换/下标防冲突）</div>
+  <div class="feature-item">SSRF 防护（云元数据/内网IP拦截）</div>
+</div>
+<h3>测试生命周期</h3>
+<div class="entity-tree">
+1. get_flow          → 理解业务流（LLM + 知识库RAG）
+2. generate_testcase → AI 生成测试用例
+3. get_dependency    → 分析 API 调用顺序和依赖关系
+4. fill_testdata     → 根据依赖填充测试数据
+5. execute           → 顺序执行 API（变量提取/占位符替换/Token注入）
+6. validate          → AI 校验（通过/失败 + 根因分析）
+</div>
+<h3>数据模型</h3>
+<div class="entity-tree">
+ApiEnvironment (name, env_type, base_url, auth_type, default_headers, global_vars)
+  └── ApiTestRun (result, duration_ms, step_results, variables_snapshot,
+                   error_message, ai_validation)
+        └── ApiTestCase (name, precondition, testpoint, expectation,
+                          test_data, run_list, priority, tags)
+              └── 关联: Project, TestCaseVersion, TestModule
+</div>
+</div>
+
+<!-- Domain 5 -->
+<div class="domain-card">
+<div class="domain-header">
+  <div class="domain-icon" style="background:var(--domain-5);">🧠</div>
+  <div class="domain-name">2.5 AI 能力（双引擎）</div>
+</div>
+<h3>AI 推理引擎 (ai-generator-service)</h3>
+<div class="feature-grid">
+  <div class="feature-item">同步/流式/批量推理（OpenAI 兼容 API）</div>
+  <div class="feature-item">异步批量推理 + 任务状态轮询</div>
+  <div class="feature-item">测试用例生成：多方向并行（信号量限流10）</div>
+  <div class="feature-item">SSE 流式输出（实时推送日志）</div>
+  <div class="feature-item">SDK timeout（120s）+ 重试 + 模型缓存</div>
+  <div class="feature-item">任务存储（内存态 + 定期清理）</div>
+  <div class="feature-item">服务启动清理残留任务</div>
+</div>
+<h3>接口测试引擎 (api-testing-service)</h3>
+<div class="feature-grid">
+  <div class="feature-item">6 步完整测试管道（SSE 流式每步）</div>
+  <div class="feature-item">MCP 服务器（6 个工具供 AI Agent 调用）</div>
+  <div class="feature-item">知识库 RAG 增强（WeKnora 集成）</div>
+  <div class="feature-item">真实 HTTP 执行器（httpx AsyncClient + Session）</div>
+  <div class="feature-item">SSRF 防护（9 个测试用例覆盖）</div>
+  <div class="feature-item">变量占位符多层解析（${} {} {{}} 裸变量）</div>
+  <div class="feature-item">Cookie/JWT Token 自动注入 + 测试账号清理</div>
+  <div class="feature-item">LLM 校验确定性（temperature=0）</div>
+</div>
+<h3>MCP 工具列表</h3>
+<div class="perm-grid">
+  <div class="perm-tag">get_api_flow</div><div class="perm-tag">generate_testcases</div>
+  <div class="perm-tag">get_api_dependency</div><div class="perm-tag">fill_testdata</div>
+  <div class="perm-tag">execute_testcase</div><div class="perm-tag">validate_testcase</div>
+</div>
+</div>
+
+<!-- Domain 6 -->
+<div class="domain-card">
+<div class="domain-header">
+  <div class="domain-icon" style="background:var(--domain-6);">📚</div>
+  <div class="domain-name">2.6 知识库与需求管理</div>
+</div>
+<div class="feature-grid" style="grid-template-columns: 1fr;">
+  <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+    <div class="feature-item">知识库 CRUD（创建/编辑/删除/复制/置顶/搜索）</div>
+    <div class="feature-item">文档管理（上传/URL导入/手动Markdown/预览/下载/重解析）</div>
+    <div class="feature-item">混合搜索（向量 + 关键词）</div>
+    <div class="feature-item">文档迁移（跨知识库 + 进度查询）</div>
+    <div class="feature-item">Agent 会话管理（创建/对话/流式回复）</div>
+    <div class="feature-item">从知识库提取需求（一站式）</div>
+    <div class="feature-item">从知识库生成测试用例</div>
+    <div class="feature-item">需求管理 CRUD（按版本/模块筛选/批量操作）</div>
+    <div class="feature-item">需求 → 测试用例生成（单个/批量）</div>
+    <div class="feature-item">需求模块统计（版本维度）</div>
+    <div class="feature-item">文件上传白名单（32种扩展名）+ 50MB 限制</div>
+    <div class="feature-item">知识库项目级权限（写操作校验成员身份）</div>
+  </div>
+</div>
+<h3>数据模型</h3>
+<div class="entity-tree">
+Requirement (title, description, func_point, priority, status, source,
+            knowledge_base_id, knowledge_id, session_id)
+  ├── FK: Project
+  ├── FK: TestCaseVersion (nullable)
+  └── 反向: TestCase (通过 requirement FK)
+
+知识库 (WeKnora 外部服务代理，无本地模型)
+  通过 KBClient 代理所有操作（创建/搜索/文档管理/会话）
+</div>
+</div>
+
+</div>
+
+<!-- ============================ SECTION 3: Security ============================ -->
+<div class="section">
+<h2>3. 安全架构</h2>
+
+<h3>3.1 认证体系</h3>
+<table>
+  <tr><th>机制</th><th>实现</th></tr>
+  <tr><td>JWT 认证</td><td>自定义 JWTAuthentication（djangorestframework-simplejwt）</td></tr>
+  <tr><td>Token 刷新</td><td>过期前 5 分钟自动刷新（前端去重并发）</td></tr>
+  <tr><td>Token 黑名单</td><td>登出立即失效（数据库存储 jti）</td></tr>
+  <tr><td>CORS 白名单</td><td>get_safe_cors_origin() 统一校验（禁止反射 Origin）</td></tr>
+  <tr><td>内部服务认证</td><td>X-Internal-API-Key 头 + 环境变量对比</td></tr>
+  <tr><td>API Key 鉴权</td><td>微服务 X-API-Key 头（dev 模式可跳过）</td></tr>
+  <tr><td>密码加密</td><td>Django PBKDF2 + 重置用加密签名 Token</td></tr>
+  <tr><td>限流</td><td>按 IP 限流（生产 60次/分）+ AI 生成限流（10-20次/时）</td></tr>
+</table>
+
+<h3>3.2 授权层级</h3>
+<div class="entity-tree">
+系统级：system_admin > 系统权限(9种) > 普通用户
+  │
+项目级：Owner > Admin > 自定义角色(12种权限) > 成员 > 游客
+  │
+数据级：项目成员自动可见依赖项目的用例库/版本/模块/用例/需求/接口测试
+</div>
+
+<h3>3.3 安全防护</h3>
+<div class="feature-grid">
+  <div class="feature-item">HSTS + 安全 Cookie（生产环境强制 HTTPS）</div>
+  <div class="feature-item">CSRF 保护（非流式视图） + 凭据遮蔽（审计日志）</div>
+  <div class="feature-item">SSRF 防护（拦截 169.254.169.254 / 内网 / loopback）</div>
+  <div class="feature-item">文件上传白名单（32 种扩展名 + 50MB 上限）</div>
+  <div class="feature-item">管理员凭据不入 LLM 提示词（占位符本地解析）</div>
+  <div class="feature-item">SECRET_KEY 强制生产环境覆盖（开发回退拦截）</div>
+  <div class="feature-item">密码强度强制（大小写+数字+黑名单）</div>
+  <div class="feature-item">登录防枚举（静默返回不暴露用户是否存在）</div>
+</div>
+</div>
+
+<!-- ============================ SECTION 4: Data Model Summary ============================ -->
+<div class="section">
+<h2>4. 完整数据模型（15 个模型 / 8 张关键表）</h2>
+
+<table>
+  <tr><th>App</th><th>模型</th><th>关键字段</th><th>主要关系</th></tr>
+  <tr><td>users</td><td>User</td><td>username, email(unique), system_role(FK), status, avatar</td><td>→ Role, → 所有 created_by/updated_by</td></tr>
+  <tr><td>users</td><td>Role</td><td>name, code, type, permissions(JSON)</td><td>← User</td></tr>
+  <tr><td>users</td><td>TokenBlacklist</td><td>jti, token, user(FK), expires_at</td><td>← User</td></tr>
+  <tr><td>projects</td><td>Project</td><td>name, code(unique), type, status, owner(FK), knowledge_base_id</td><td>→ User, → ProjectMember, → ProjectRole</td></tr>
+  <tr><td>projects</td><td>ProjectMember</td><td>project(FK), user(FK), role, status, is_favorite</td><td>← Project, ← User</td></tr>
+  <tr><td>projects</td><td>ProjectRole</td><td>project(FK), role_key, name, color, permissions(JSON)</td><td>← Project</td></tr>
+  <tr><td>testcase</td><td>TestCaseRepository</td><td>project(FK), name, is_default</td><td>← Project, → TestCaseVersion</td></tr>
+  <tr><td>testcase</td><td>TestCaseVersion</td><td>repository(FK), name, status, is_default</td><td>← Repository, → Module/TestCase</td></tr>
+  <tr><td>testcase</td><td>TestModule</td><td>version(FK), parent(self FK), name, sort_order</td><td>← Version, → self (树形)</td></tr>
+  <tr><td>testcase</td><td>TestCase</td><td>title, version(FK), module(FK), priority, requirement(FK), review_status</td><td>← Version, ← Module, ← Requirement</td></tr>
+  <tr><td>testcase</td><td>TestCaseReview</td><td>test_case(FK), reviewer(FK), status, revision_number, previous_review(self FK)</td><td>← TestCase, ← User, → self (多轮链)</td></tr>
+  <tr><td>testcase</td><td>AIGenerationRecord</td><td>test_case(FK), version(FK), knowledge_base_ids(JSON), ai_confidence</td><td>← TestCase, ← Version</td></tr>
+  <tr><td>apitest</td><td>ApiEnvironment</td><td>project(FK), name, env_type, base_url, auth_type, is_default</td><td>← Project</td></tr>
+  <tr><td>apitest</td><td>ApiTestCase</td><td>project(FK), name, testpoint, expectation, test_data(JSON), run_list(JSON)</td><td>← Project, → ApiTestRun</td></tr>
+  <tr><td>requirement</td><td>Requirement</td><td>project(FK), version(FK), title, func_point, priority, source</td><td>← Project, ← Version, → TestCase</td></tr>
+</table>
+</div>
+
+<!-- ============================ SECTION 5: Integration ============================ -->
+<div class="section">
+<h2>5. 集成与扩展能力</h2>
+
+<h3>5.1 外部服务集成</h3>
+<table>
+  <tr><th>服务</th><th>用途</th><th>接口</th></tr>
+  <tr><td>WeKnora 知识库</td><td>RAG 检索 / 文档管理 / Agent 会话</td><td>REST API (api_key 鉴权)</td></tr>
+  <tr><td>LLM (OpenAI 兼容)</td><td>推理 / 生成 / 校验</td><td>OpenAI API (api_key 鉴权)</td></tr>
+  <tr><td>MCP 协议</td><td>AI Agent/Skill 框架调用测试能力</td><td>stdio MCP Server</td></tr>
+</table>
+
+<h3>5.2 部署架构</h3>
+<div class="arch-block" style="font-family: monospace; font-size: .82em; line-height: 1.8;">
+开发环境: SQLite + 运行所有服务在 localhost
+  ├── Django:     8000  (manage.py runserver)
+  ├── AI Gen:     8001  (uvicorn main:app)
+  ├── API Test:   8002  (uvicorn main:app)
+  ├── WeKnora:    外部  (通过 api_key 连接)
+  └── Vue3:       5173  (vite dev)
+
+生产建议: PostgreSQL + Redis + Gunicorn/Uvicorn + Nginx
+</div>
+
+<h3>5.3 管理命令（8 个）</h3>
+<div class="perm-grid">
+  <div class="perm-tag">seed_test_data</div>
+  <div class="perm-tag">migrate_requirements</div>
+  <div class="perm-tag">clean_duplicate_defaults</div>
+  <div class="perm-tag">check_duplicate_emails</div>
+  <div class="perm-tag">createsuperuser</div>
+  <div class="perm-tag">makemigrations</div>
+  <div class="perm-tag">migrate</div>
+  <div class="perm-tag">shell</div>
+</div>
+</div>
+
+</div>
+</body>
+</html>

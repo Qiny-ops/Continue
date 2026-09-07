@@ -1,0 +1,666 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>项目深度审查报告 — software-testing-wiki</title>
+<style>
+:root {
+  --bg: #fff;
+  --text: #2c3e50;
+  --text-secondary: #5a6a7e;
+  --border: #e2e8f0;
+  --critical: #dc3545;
+  --critical-bg: #fff5f5;
+  --high: #e67e22;
+  --high-bg: #fff8f1;
+  --medium: #f0ad4e;
+  --medium-bg: #fffdf5;
+  --low: #3498db;
+  --low-bg: #f0f8ff;
+  --card-shadow: 0 1px 3px rgba(0,0,0,.08);
+  --code-bg: #f7fafc;
+  --accent: #667eea;
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; color:var(--text); background:var(--bg); line-height:1.7; padding:0; }
+.container { max-width: 1100px; margin:0 auto; padding: 20px; }
+
+.header { background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%); color: #fff; padding: 60px 20px; text-align: center; }
+.header h1 { font-size: 2.2em; font-weight: 800; margin-bottom: 8px; }
+.header .subtitle { color: #a8b2d1; font-size: 1.1em; }
+.header .meta { margin-top: 16px; color: #8892b0; font-size: .85em; }
+
+.summary-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; margin: 30px 0; }
+.summary-card { border-radius: 10px; padding: 20px; box-shadow: var(--card-shadow); border: 1px solid var(--border); text-align: center; }
+.summary-card .count { font-size: 2.4em; font-weight: 800; line-height: 1.2; }
+.summary-card .label { font-size: .9em; color: var(--text-secondary); margin-top: 4px; }
+.summary-card.critical { border-left: 4px solid var(--critical); }
+.summary-card.critical .count { color: var(--critical); }
+.summary-card.high { border-left: 4px solid var(--high); }
+.summary-card.high .count { color: var(--high); }
+.summary-card.medium { border-left: 4px solid var(--medium); }
+.summary-card.medium .count { color: var(--medium); }
+.summary-card.low { border-left: 4px solid var(--low); }
+.summary-card.low .count { color: var(--low); }
+
+.section { margin: 40px 0; }
+.section h2 { font-size: 1.5em; color: #1a1a2e; border-bottom: 2px solid var(--accent); padding-bottom: 8px; margin-bottom: 20px; }
+.section h3 { font-size: 1.15em; color: #34495e; margin: 24px 0 12px; }
+.section h4 { font-size: 1em; color: #2c3e50; margin: 16px 0 8px; }
+
+.issue { border: 1px solid var(--border); border-radius: 8px; padding: 16px 20px; margin: 12px 0; box-shadow: var(--card-shadow); }
+.issue .severity { display: inline-block; padding: 2px 10px; border-radius: 4px; font-size: .75em; font-weight: 700; text-transform: uppercase; margin-right: 10px; }
+.issue .severity.crit { background: var(--critical); color: #fff; }
+.issue .severity.high { background: var(--high); color: #fff; }
+.issue .severity.med { background: var(--medium); color: #1a1a2e; }
+.issue .severity.low { background: var(--low); color: #fff; }
+
+.issue .title { font-size: 1.05em; font-weight: 700; margin: 8px 0; }
+.issue .location { font-size: .82em; color: var(--text-secondary); margin-bottom: 6px; font-family: 'SF Mono', 'Fira Code', monospace; }
+.issue .desc { font-size: .92em; margin: 6px 0; }
+.issue .impact { font-size: .85em; padding: 6px 10px; border-radius: 4px; margin: 8px 0; }
+.issue .impact.crit-bg { background: var(--critical-bg); border-left: 3px solid var(--critical); }
+.issue .impact.high-bg { background: var(--high-bg); border-left: 3px solid var(--high); }
+.issue .impact.med-bg { background: var(--medium-bg); border-left: 3px solid var(--medium); }
+.issue .impact.low-bg { background: var(--low-bg); border-left: 3px solid var(--low); }
+
+.code-block { background: var(--code-bg); border: 1px solid var(--border); border-radius: 6px; padding: 12px 16px; margin: 10px 0; overflow-x: auto; font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace; font-size: .85em; line-height: 1.5; }
+.code-block .kw { color: #d73a49; }
+.code-block .str { color: #032f62; }
+.code-block .cm { color: #6a737d; font-style: italic; }
+
+.two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+@media (max-width: 768px) { .two-col { grid-template-columns: 1fr; } }
+
+.good { background: #f0faf0; border-left: 3px solid #27ae60; padding: 10px 14px; border-radius: 4px; margin: 10px 0; font-size: .9em; }
+.good::before { content: '✅ '; }
+
+table { width: 100%; border-collapse: collapse; margin: 16px 0; }
+th, td { padding: 10px 14px; text-align: left; border-bottom: 1px solid var(--border); font-size: .9em; }
+th { background: #f8fafc; font-weight: 700; color: #1a1a2e; }
+tr:hover { background: #f8fafc; }
+
+.priority-chart { display: flex; gap: 4px; margin: 20px 0; align-items: flex-end; height: 120px; }
+.priority-chart .bar { flex:1; border-radius: 4px 4px 0 0; text-align: center; padding-top: 8px; color: #fff; font-weight: 700; font-size: .85em; }
+.priority-chart .bar.crit { background: var(--critical); height: 100%; }
+.priority-chart .bar.high { background: var(--high); height: 55%; }
+.priority-chart .bar.med { background: var(--medium); height: 65%; color: #1a1a2e; }
+.priority-chart .bar.low { background: var(--low); height: 45%; }
+
+.arch-diagram { background: #f8fafc; border: 1px solid var(--border); border-radius: 8px; padding: 20px; margin: 16px 0; font-family: 'SF Mono', monospace; font-size: .82em; line-height: 1.6; white-space: pre; overflow-x: auto; }
+
+.toc { background: #f8fafc; border-radius: 8px; padding: 20px 24px; margin: 24px 0; }
+.toc ol { padding-left: 20px; }
+.toc li { margin: 4px 0; }
+
+.verdict { background: linear-gradient(135deg, #fff5f5 0%, #fff8f1 50%, #f0f8ff 100%); border: 2px solid var(--accent); border-radius: 12px; padding: 24px; margin: 30px 0; text-align: center; }
+.verdict .verdict-title { font-size: 1.3em; font-weight: 800; color: #1a1a2e; }
+.verdict .verdict-sub { font-size: .95em; color: var(--text-secondary); margin-top: 8px; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>🔍 项目深度审查报告</h1>
+  <div class="subtitle">测试用例管理系统 (software-testing-wiki) — 全维度代码审查</div>
+  <div class="meta">审查日期: 2026-08-05 &nbsp;|&nbsp; 审查范围: 4 个服务 + 共享模块 + 前端 &nbsp;|&nbsp; 审查人员: 阿瑞斯 (AI 助手)</div>
+</div>
+
+<div class="container">
+
+<!-- 总览卡片 -->
+<div class="summary-cards">
+  <div class="summary-card critical"><div class="count">5</div><div class="label">严重 (Critical)</div></div>
+  <div class="summary-card high"><div class="count">8</div><div class="label">高危 (High)</div></div>
+  <div class="summary-card medium"><div class="count">19</div><div class="label">中危 (Medium)</div></div>
+  <div class="summary-card low"><div class="count">13</div><div class="label">低危 / 建议 (Low)</div></div>
+</div>
+
+<!-- 目录 -->
+<div class="toc">
+  <strong>📑 目录</strong>
+  <ol>
+    <li><a href="#s1">严重问题 — 需立即修复</a></li>
+    <li><a href="#s2">高危问题 — 本周内修复</a></li>
+    <li><a href="#s3">中危问题 — 本迭代修复</a></li>
+    <li><a href="#s4">低危问题 / 改进建议</a></li>
+    <li><a href="#s5">架构风险分析</a></li>
+    <li><a href="#s6">项目亮点与正面发现</a></li>
+    <li><a href="#s7">综合评估与行动计划</a></li>
+  </ol>
+</div>
+
+<!-- 总体评估 -->
+<div class="verdict">
+  <div class="verdict-title">🏥 项目健康度: C+ / 需要立即干预</div>
+  <div class="verdict-sub">
+    发现 <strong>5 个运行时 Bug（会导致 NameError / 功能不可用）</strong>、<strong>2 个 CORS 安全漏洞</strong>、<strong>真实 API Key 已泄露在 .env 文件中</strong>。
+    架构设计整体良好，但在权限控制、错误处理和代码重复方面存在系统性问题。
+  </div>
+</div>
+
+<!-- ==================== 第一节: 严重问题 ==================== -->
+<div class="section" id="s1">
+<h2>1. 🔴 严重问题 — 需立即修复 (P0)</h2>
+
+<!-- C-1 -->
+<div class="issue">
+  <span class="severity crit">Critical</span>
+  <span class="severity crit">运行时 Bug</span>
+  <div class="title">1.1 auth_service.py 使用未导入的异常类 → refresh_token() 功能完全不可用</div>
+  <div class="location">📁 Testbackend/apps/users/services/auth_service.py &nbsp;|&nbsp; 📍 L114, L119, L122</div>
+  <div class="desc">
+    <code>refresh_token()</code> 方法中使用了 <code>BusinessError</code> 和 <code>NotFoundError</code>，但文件顶部只导入了 <code>ValidationError</code> 和 <code>AuthenticationError</code>。任何调用 <code>refresh_token()</code> 的请求都会抛出 <strong>NameError</strong>。
+  </div>
+  <div class="code-block">
+<span class="cm"># 第15行：只导入了这两个</span>
+<span class="kw">from</span> apps.core.exceptions <span class="kw">import</span> ValidationError, AuthenticationError
+
+<span class="cm"># 第114行：BusinessError 未导入！</span>
+<span class="kw">raise</span> BusinessError(<span class="str">'Token无效或已过期'</span>)
+<span class="cm"># 第119行：NotFoundError 未导入！</span>
+<span class="kw">raise</span> NotFoundError(<span class="str">'用户不存在'</span>)</div>
+  <div class="impact crit-bg"><strong>影响:</strong> Token 刷新功能完全不可用。用户 token 过期后无法刷新，只能重新登录。</div>
+</div>
+
+<!-- C-2 -->
+<div class="issue">
+  <span class="severity crit">Critical</span>
+  <span class="severity crit">运行时 Bug</span>
+  <div class="title">1.2 projects/views/views.py 多处解构不存在的 error 变量 → NameError</div>
+  <div class="location">📁 Testbackend/apps/projects/views/views.py &nbsp;|&nbsp; 📍 L203, L221, L238, L258, L345, L290</div>
+  <div class="desc">
+    多个视图函数中直接使用 <code>error</code> 变量，但服务方法返回的是单个值（dict/布尔值），不是 <code>(result, error)</code> 元组，导致 <strong>NameError</strong>。影响 add/update/remove/batch_update 成员、get_activities、update_role 等 6+ 个 API 端点。
+  </div>
+  <div class="code-block">
+<span class="cm"># 第196-206行：add_project_member_view</span>
+member_data = ProjectMemberService.add_member(...)  <span class="cm"># 返回 dict，不是 tuple</span>
+<span class="kw">if</span> error:  <span class="cm"># ← NameError: name 'error' is not defined</span>
+    code = 404 <span class="kw">if</span> <span class="str">'不存在'</span> <span class="kw">in</span> error <span class="kw">else</span> 400</div>
+  <div class="impact crit-bg"><strong>影响:</strong> 项目成员管理的全部 CRUD 操作不可用。前端调用这些接口会收到 500 错误。</div>
+</div>
+
+<!-- C-3 -->
+<div class="issue">
+  <span class="severity crit">Critical</span>
+  <span class="severity crit">安全</span>
+  <div class="title">1.3 SSE 流式视图中 CORS Origin 绕过白名单校验</div>
+  <div class="location">📁 Testbackend/apps/testcase/views/ai_views.py &nbsp;|&nbsp; 📍 L357, L1243, L1264, L1607</div>
+  <div class="desc">
+    多处 SSE 流式响应直接使用 <code>request.META.get('HTTP_ORIGIN', ...)</code> 设置 CORS 头，<strong>完全绕过</strong> <code>get_safe_cors_origin()</code> 白名单校验。且同时启用了 <code>Access-Control-Allow-Credentials: true</code>，形成有效的跨域凭据携带漏洞。
+  </div>
+  <div class="code-block">
+<span class="cm"># 第357行：origin 直接取请求头，不做白名单校验</span>
+origin = request.META.get(<span class="str">'HTTP_ORIGIN'</span>, <span class="str">'http://localhost:5174'</span>)
+
+<span class="cm"># 第1243行：直接使用未校验的 origin</span>
+response[<span class="str">'Access-Control-Allow-Origin'</span>] = origin  <span class="cm"># ← 风险！</span>
+response[<span class="str">'Access-Control-Allow-Credentials'</span>] = <span class="str">'true'</span>
+
+<span class="cm"># 第1264行：DRF 版本用 * 做 fallback</span>
+response[<span class="str">'Access-Control-Allow-Origin'</span>] = request.META.get(<span class="str">'HTTP_ORIGIN'</span>, <span class="str">'*'</span>)</div>
+  <div class="impact crit-bg"><strong>影响:</strong> 任意网站发起的跨域请求都可携带用户凭据访问 SSE 流式接口，可能导致 AI 生成结果被窃取。</div>
+</div>
+
+<!-- C-4 -->
+<div class="issue">
+  <span class="severity crit">Critical</span>
+  <span class="severity crit">凭据泄露</span>
+  <div class="title">1.4 .env 文件包含真实 API Key，已暴露给本地文件系统</div>
+  <div class="location">📁 Testbackend/.env &nbsp;|&nbsp; 📁 ai-generator-service/.env &nbsp;|&nbsp; 📁 api-testing-service/.env</div>
+  <div class="desc">
+    三个服务的 <code>.env</code> 文件中包含真实的生产凭据，包括 WeKnora API Key、智谱 AI API Key、内网 LLM 服务地址等。虽然 <code>.gitignore</code> 已排除 <code>.env</code>，但若曾提交到版本库历史中，这些凭据已永久泄露。
+  </div>
+  <div class="code-block">
+<span class="cm"># Testbackend/.env 中的真实凭据</span>
+WEKNORA_API_KEY=sk-yai8wFpY7M8LH4Ke2po4_JoskFAit3658aFgiG0AevS6rEm6
+OPENAI_API_KEY=5343044c3b8746fab2c09807f1f53d84.W6hHmBzbFJ5wORO8
+LOCAL_MODEL_BASE_URL=http://120.209.70.202:31389/v1
+
+<span class="cm"># api-testing-service/.env</span>
+KB_API_KEY=sk-yai8wFpY7M8LH4Ke2po4_JoskFAit3658aFgiG0AevS6rEm6
+ADMIN_USERNAME=admin
+ADMIN_PASSWORD=admin123</div>
+  <div class="impact crit-bg"><strong>影响:</strong> 若代码被分享、电脑被盗、或曾推送过包含 .env 的提交，外部 LLM API 配额和知识库数据可被恶意消费。建议立即轮换所有 Key。</div>
+</div>
+
+<!-- C-5 -->
+<div class="issue">
+  <span class="severity crit">Critical</span>
+  <span class="severity crit">安全</span>
+  <div class="title">1.5 内部服务 API Key 硬编码在源码中</div>
+  <div class="location">📁 api-testing-service/app/config.py &nbsp;|&nbsp; 📍 L53</div>
+  <div class="desc">
+    服务间认证密钥 <code>internal_api_key</code> 在源码中有硬编码默认值 <code>"internal-service-key-dev"</code>。如果生产环境未覆盖此环境变量，任何人都可以用这个已知默认值调用内部清理接口。
+  </div>
+  <div class="code-block">
+internal_api_key: str = <span class="str">"internal-service-key-dev"</span>  <span class="cm"># ← 硬编码默认值</span></div>
+  <div class="impact crit-bg"><strong>影响:</strong> 攻击者可用此默认密钥伪装为内部服务，调用 Django 的 cleanup-test-user 端点删除数据。</div>
+</div>
+</div>
+
+<!-- ==================== 第二节: 高危问题 ==================== -->
+<div class="section" id="s2">
+<h2>2. 🟠 高危问题 — 本周内修复 (P1)</h2>
+
+<div class="issue">
+  <span class="severity high">High</span>
+  <span class="severity high">安全</span>
+  <div class="title">2.1 管理员凭据被注入到 LLM 提示词中</div>
+  <div class="location">📁 api-testing-service/app/engine.py &nbsp;|&nbsp; 📍 L131-132, L257-260, L379-380</div>
+  <div class="desc">
+    <code>TestEngine</code> 将管理员用户名和密码以明文形式嵌入发送到第三方 LLM API 的提示词中。若 LLM 服务商记录提示词数据，管理凭据将泄露。
+  </div>
+  <div class="impact high-bg"><strong>影响:</strong> 第三方 LLM 提供商可能获取到测试系统的管理员凭据，导致权限提升和数据泄露。</div>
+</div>
+
+<div class="issue">
+  <span class="severity high">High</span>
+  <span class="severity high">安全</span>
+  <div class="title">2.2 知识库全部 API 缺少项目级权限检查</div>
+  <div class="location">📁 Testbackend/apps/knowledge/views/knowledge_base_views.py &nbsp;|&nbsp; 📁 knowledge_views.py</div>
+  <div class="desc">
+    知识库创建、编辑、删除、复制、置顶以及所有知识文档（上传、删除、下载、URL导入）操作仅检查 <code>IsAuthenticated</code>，没有验证用户是否为关联项目的成员。任何已登录用户都可以操作任意项目的知识库。
+  </div>
+  <div class="impact high-bg"><strong>影响:</strong> 已认证用户可以跨项目删除/修改其他项目的知识库和文档，造成大规模数据丢失。</div>
+</div>
+
+<div class="issue">
+  <span class="severity high">High</span>
+  <span class="severity high">安全</span>
+  <div class="title">2.3 用户敏感信息接口无权限控制</div>
+  <div class="location">📁 Testbackend/apps/users/views/views.py &nbsp;|&nbsp; 📍 L470-491 (get_user_view)</div>
+  <div class="desc">
+    <code>get_user_view</code> 仅要求 <code>IsAuthenticated</code>，任何已登录用户可查看任意用户邮箱、手机号、最后登录时间/IP 等敏感信息。同理，<code>create_permission_view</code> 等权限管理接口也缺少 <code>@require_system_admin</code>。
+  </div>
+  <div class="impact high-bg"><strong>影响:</strong> 已认证用户可枚举所有用户信息（含隐私数据），并可随意管理系统权限。</div>
+</div>
+
+<div class="issue">
+  <span class="severity high">High</span>
+  <span class="severity high">安全</span>
+  <div class="title">2.4 密码重置 Token 使用数据库存储而非加密签名</div>
+  <div class="location">📁 Testbackend/apps/users/services/user_service.py &nbsp;|&nbsp; 📍 L357-358</div>
+  <div class="desc">
+    密码重置使用 <code>secrets.token_urlsafe(32)</code> 生成的 token 直接存储在数据库中。若数据库泄露，攻击者可提取所有用户的密码重置 token。应使用 Django 内置的 <code>PasswordResetTokenGenerator</code>（基于 HMAC 签名，无需存储）。
+  </div>
+  <div class="impact high-bg"><strong>影响:</strong> 数据库泄露 = 所有用户的密码重置 token 被一网打尽。</div>
+</div>
+
+<div class="issue">
+  <span class="severity high">High</span>
+  <span class="severity high">逻辑缺陷</span>
+  <div class="title">2.5 ApiTestPermissionService 未过滤已禁用成员</div>
+  <div class="location">📁 Testbackend/apps/apitest/services/permission.py &nbsp;|&nbsp; 📍 L17-19</div>
+  <div class="desc">
+    <code>get_user_project_ids()</code> 没有过滤 <code>status='active'</code>，已禁用的成员仍可访问 API 测试用例。而 <code>ProjectPermissionService</code> 中的同名方法正确过滤了状态，存在不一致。
+  </div>
+  <div class="impact high-bg"><strong>影响:</strong> 已被移除或禁用的项目成员仍然可以操作接口测试用例。</div>
+</div>
+
+<div class="issue">
+  <span class="severity high">High</span>
+  <span class="severity high">功能缺失</span>
+  <div class="title">2.6 知识库文件上传无类型和大小验证</div>
+  <div class="location">📁 Testbackend/apps/knowledge/views/knowledge_views.py &nbsp;|&nbsp; 📍 L37-62</div>
+  <div class="desc">
+    知识库文件上传接口仅通过 <code>request.FILES</code> 获取文件并读取内容，没有验证文件类型（无 MIME 检查、无扩展名白名单）、大小限制或恶意内容扫描。
+  </div>
+  <div class="impact high-bg"><strong>影响:</strong> 可上传任意类型和大小的文件（含恶意脚本），可能导致存储耗尽或服务端被攻击。</div>
+</div>
+
+<div class="issue">
+  <span class="severity high">High</span>
+  <span class="severity high">稳定性</span>
+  <div class="title">2.7 序列化器中递归查询 → N+1 性能黑洞</div>
+  <div class="location">📁 Testbackend/apps/testcase/serializers/testcase_serializers.py &nbsp;|&nbsp; 📍 L132-145</div>
+  <div class="desc">
+    <code>TestModuleSerializer._get_all_module_ids()</code> 递归访问 <code>module.children.all()</code>，每次序列化一个模块就触发多次子模块查询。在深层模块树结构下，单次请求可产生数百次数据库查询。
+  </div>
+  <div class="impact high-bg"><strong>影响:</strong> 模块树较深时接口响应时间指数级增长，可能导致超时。</div>
+</div>
+
+<div class="issue">
+  <span class="severity high">High</span>
+  <span class="severity high">代码质量</span>
+  <div class="title">2.8 900 行超长函数 — generate_test_cases_stream_native</div>
+  <div class="location">📁 Testbackend/apps/testcase/views/ai_views.py &nbsp;|&nbsp; 📍 L341-1247</div>
+  <div class="desc">
+    <code>generate_test_cases_stream_native</code> 是一个 ~900 行的巨函数，混合了 SSE 事件生成、知识库检索、AI 生成、向量去重、数据库持久化、错误处理和 CORS 配置。同时与 <code>generate_test_cases_stream</code>（DRF 版本，~350 行）有 ~80% 的代码重复。
+  </div>
+  <div class="impact high-bg"><strong>影响:</strong> 极高维护成本；CORS 处理不一致导致安全漏洞；任何修改都需要在两个位置同步。</div>
+</div>
+</div>
+
+<!-- ==================== 第三节: 中危问题 ==================== -->
+<div class="section" id="s3">
+<h2>3. 🟡 中危问题 — 本迭代修复 (P2)</h2>
+
+<table>
+  <tr><th>#</th><th>问题</th><th>位置</th><th>影响</th></tr>
+  <tr>
+    <td>3.1</td>
+    <td><strong>审计日志在 JSON 解析失败时记录未遮蔽的完整请求体</strong></td>
+    <td>audit_log.py L146</td>
+    <td>敏感信息（密码、token）以明文写入日志</td>
+  </tr>
+  <tr>
+    <td>3.2</td>
+    <td><strong>DEBUG 模式下限流过高（1000 次/分钟）</strong></td>
+    <td>rate_limit.py L21</td>
+    <td>若部署时误保持 DEBUG=True，暴力破解无有效防护</td>
+  </tr>
+  <tr>
+    <td>3.3</td>
+    <td><strong>SSE 错误响应在 DEBUG 模式下暴露堆栈跟踪</strong></td>
+    <td>ai_views.py L1234</td>
+    <td>泄露文件系统路径、包结构信息</td>
+  </tr>
+  <tr>
+    <td>3.4</td>
+    <td><strong>5 处裸 except: 子句（含 finally 块）</strong></td>
+    <td>json_parser.py L80; ai_views.py L718 等</td>
+    <td>可能捕获 KeyboardInterrupt、SystemExit，导致资源泄漏</td>
+  </tr>
+  <tr>
+    <td>3.5</td>
+    <td><strong>6 处静默异常吞噬（except: pass）</strong></td>
+    <td>ai_views.py L960, L1169; ai_client.py L394 等</td>
+    <td>异步事件循环中的错误被默默丢弃</td>
+  </tr>
+  <tr>
+    <td>3.6</td>
+    <td><strong>120+ 处宽泛的 except Exception 捕获</strong></td>
+    <td>各 views/services 文件</td>
+    <td>数据库连接错误等严重问题被降级为 400 错误</td>
+  </tr>
+  <tr>
+    <td>3.7</td>
+    <td><strong>连表查询无 None 检查（链式外键可抛 AttributeError）</strong></td>
+    <td>project_service.py L391</td>
+    <td><code>review.test_case.version.repository.project</code> 若中间为 None 则崩溃</td>
+  </tr>
+  <tr>
+    <td>3.8</td>
+    <td><strong>TestConnection 功能是桩实现 → 始终返回成功</strong></td>
+    <td>apitest/views/__init__.py L91</td>
+    <td>用户被告知连接正常但实际未验证</td>
+  </tr>
+  <tr>
+    <td>3.9</td>
+    <td><strong>get_project_activities 5 次独立查询</strong></td>
+    <td>project_service.py L908-978</td>
+    <td>活动列表接口性能差</td>
+  </tr>
+  <tr>
+    <td>3.10</td>
+    <td><strong>build_project_data 每个项目 3 次 COUNT 查询</strong></td>
+    <td>project_service.py L252-256</td>
+    <td>项目列表页 N*3 次额外查询</td>
+  </tr>
+  <tr>
+    <td>3.11</td>
+    <td><strong>多个 .filter() OR 组合可用 Q 对象优化</strong></td>
+    <td>testcase/viewsets.py L268-273</td>
+    <td>搜索性能下降</td>
+  </tr>
+  <tr>
+    <td>3.12</td>
+    <td><strong>logout 视图 Token 解析脆弱（未处理无空格的 Bearer）</strong></td>
+    <td>users/views/views.py L93-96</td>
+    <td>格式异常的 Authorization 头导致 IndexError</td>
+  </tr>
+  <tr>
+    <td>3.13</td>
+    <td><strong>输入参数直接 int() 转换无防御</strong></td>
+    <td>users/views/views.py L271 等多处</td>
+    <td>非数字 query 参数导致 500 错误</td>
+  </tr>
+  <tr>
+    <td>3.14</td>
+    <td><strong>LLM 参数无上限校验（max_tokens 可任意大）</strong></td>
+    <td>knowledge/views/agent_views.py L89</td>
+    <td>LLM API 调用成本不可控</td>
+  </tr>
+  <tr>
+    <td>3.15</td>
+    <td><strong>csrf_exempt 装饰器禁用了流式视图的 CSRF 保护</strong></td>
+    <td>ai_views.py L340</td>
+    <td>移除了一层纵深防御</td>
+  </tr>
+  <tr>
+    <td>3.16</td>
+    <td><strong>ast.literal_eval 用于不可信 AI 生成内容</strong></td>
+    <td>core/utils/json_parser.py L94-98</td>
+    <td>LLM 可能被恶意提示词诱导返回危险字面量</td>
+  </tr>
+  <tr>
+    <td>3.17</td>
+    <td><strong>密码强度验证规则在两处不一致</strong></td>
+    <td>validators.py vs user_service.py</td>
+    <td>实际生效的规则不确定</td>
+  </tr>
+  <tr>
+    <td>3.18</td>
+    <td><strong>generate_test_cases_stream（DRF 版）未被 URL 注册 → 死代码</strong></td>
+    <td>ai_views.py L1250-1611</td>
+    <td>~360 行无用代码</td>
+  </tr>
+  <tr>
+    <td>3.19</td>
+    <td><strong>项目创建 — 用例库/版本创建失败静默吞掉</strong></td>
+    <td>project_service.py L150-181</td>
+    <td>用户可能获得无默认用例库的项目</td>
+  </tr>
+</table>
+
+</div>
+
+<!-- ==================== 第四节: 低危/建议 ==================== -->
+<div class="section" id="s4">
+<h2>4. 🔵 低危问题 / 改进建议 (P3)</h2>
+
+<table>
+  <tr><th>#</th><th>问题</th><th>建议</th></tr>
+  <tr><td>4.1</td><td>project_service.py 过长（~1136 行），包含 3 个大型服务类</td><td>拆分为 independent files</td></tr>
+  <tr><td>4.2</td><td>_parse_generated_cases 在视图和服务中重复定义（~75 行重复）</td><td>统一到 service 层</td></tr>
+  <tr><td>4.3</td><td>_build_mentioned_items 在两个文件中重复定义</td><td>提取为共享工具函数</td></tr>
+  <tr><td>4.4</td><td>权限检查函数命名不一致（has_ vs check_ vs is_ 前缀混淆）</td><td>统一命名规范</td></tr>
+  <tr><td>4.5</td><td>大量视图函数缺少类型注解</td><td>渐进式添加 typing</td></tr>
+  <tr><td>4.6</td><td>约 30 处重复的 try/except/StandardResponse 模式</td><td>使用装饰器消除重复</td></tr>
+  <tr><td>4.7</td><td>生产代码中残留 debug 日志</td><td>清理或改为 logger.debug（生产关闭）</td></tr>
+  <tr><td>4.8</td><td>ci.yml 缺少依赖安全扫描步骤</td><td>添加 pip-audit / safety 步骤</td></tr>
+  <tr><td>4.9</td><td>get_user_project_ids 逻辑在 4+ 个位置独立实现</td><td>提取为单一共享查询</td></tr>
+  <tr><td>4.10</td><td>WEKNORA_DEFAULT_EMBEDDING_MODEL_ID 等配置在各服务间不一致</td><td>统一环境变量命名和默认值</td></tr>
+  <tr><td>4.11</td><td>用户序列化器定义了但视图直接手写响应 dict</td><td>使用 DRF Serializer 进行序列化，保持一致性</td></tr>
+  <tr><td>4.12</td><td>项目成员视图使用中文子串匹配判断 HTTP 状态码</td><td>改用 BaseAPIException 子类映射</td></tr>
+  <tr><td>4.13</td><td>ai_views.py 中 csrf_exempt 重复导入（第12行和第318行）</td><td>删除重复导入</td></tr>
+</table>
+
+</div>
+
+<!-- ==================== 第五节: 架构风险 ==================== -->
+<div class="section" id="s5">
+<h2>5. 🏗 架构风险分析</h2>
+
+<div class="issue">
+  <span class="severity med">Medium</span>
+  <div class="title">5.1 单点故障：Django 是唯一的状态持有者</div>
+  <div class="desc">
+    所有业务数据存储在 Django 的 SQLite 数据库中。两个 FastAPI 微服务只是无状态的 AI/测试执行引擎，依赖 Django 提供数据。一旦 Django 宕机，整个系统不可用。微服务没有独立的降级能力。
+  </div>
+</div>
+
+<div class="issue">
+  <span class="severity med">Medium</span>
+  <div class="title">5.2 SQLite 并发瓶颈</div>
+  <div class="desc">
+    生产环境默认使用 SQLite，其写锁机制在高并发下是严重瓶颈。settings.py 中的 <code>check_production_settings()</code> 已正确警告了这一点，但没有强制执行数据库迁移。
+  </div>
+</div>
+
+<div class="issue">
+  <span class="severity med">Medium</span>
+  <div class="title">5.3 微服务间耦合度偏高</div>
+  <div class="desc">
+    Django 通过 httpx 同步调用 AI Generator（8001），再通过 SSE 透传调用 API Testing Service（8002）。虽然表面上解耦了，但 Django 的 <code>ai_views.py</code> 中包含大量对微服务输出格式的硬编码假设。如果微服务的响应结构变化，Django 侧就会崩溃。
+  </div>
+</div>
+
+<div class="issue">
+  <span class="severity med">Medium</span>
+  <div class="title">5.4 内存任务存储无持久化</div>
+  <div class="desc">
+    AI Generator 的异步批处理任务存储在内存 (<code>TaskStore</code>) 中，每 10 分钟自动清理。服务重启后所有进行中的任务丢失，且没有任何重试机制。
+  </div>
+</div>
+
+<div class="issue">
+  <span class="severity med">Medium</span>
+  <div class="title">5.5 Common 模块通过 sys.path hack 注入</div>
+  <div class="desc">
+    <code>common/</code> 模块通过在每个 FastAPI 的 <code>main.py</code> 中 <code>sys.path.insert(0, ...)</code> 方式注入 workspace 根目录。这不是标准的 Python 包管理方式，打包/部署时容易出问题。
+  </div>
+</div>
+
+<div class="issue">
+  <span class="severity low">Low</span>
+  <div class="title">5.6 前端 Vue3 所有路由默认不要求认证</div>
+  <div class="desc">
+    虽然路由守卫在 <code>router/guards.js</code> 中实现了，但 <code>router/index.js</code> 未设置 <code>DEFAULT_PERMISSION_CLASSES</code>，依赖每个路由手动添加 <code>meta.requiresAuth</code>。遗漏的风险始终存在。
+  </div>
+</div>
+
+<div class="issue">
+  <span class="severity low">Low</span>
+  <div class="title">5.7 apitest/views/api_testcase.py 中的 CORS 问题</div>
+  <div class="desc">
+    与 ai_views.py 类似，api_testcase.py 第117行和第294行也直接使用未校验的 <code>HTTP_ORIGIN</code> 设置 CORS 头。
+  </div>
+</div>
+
+</div>
+
+<!-- ==================== 第六节: 项目亮点 ==================== -->
+<div class="section" id="s6">
+<h2>6. ✅ 项目亮点与正面发现</h2>
+
+<div class="two-col">
+  <div>
+    <div class="good">Django settings.py 中生产安全配置完善（HSTS、安全 Cookie、SSL 重定向）</div>
+    <div class="good">统一的异常处理体系（BaseAPIException → custom_exception_handler）</div>
+    <div class="good">Repository/Service/View 三层架构在 Django 项目中实现质量较高</div>
+    <div class="good">SSRF 防护有专门实现 (_validate_target_url) 和测试套件</div>
+    <div class="good">API Testing Service 实现了完整的智能测试生命周期（分析→生成→依赖→填充→执行→校验）</div>
+    <div class="good">JWT + Token 黑名单机制成熟</div>
+    <div class="good">登录防暴力破解：反向代理感知的 IP 提取</div>
+  </div>
+  <div>
+    <div class="good">SECRET_KEY 有开发/生产分离和强制校验</div>
+    <div class="good">check_production_settings() 自动化部署前验证</div>
+    <div class="good">密码重置邮件发送防枚举（静默返回不暴露用户是否存在）</div>
+    <div class="good">自定义凭据遮蔽工具函数 (mask)</div>
+    <div class="good">所有 requirements.txt 版本精确固定</div>
+    <div class="good">前端 SSE 流式渲染实现</div>
+    <div class="good">系统级 + 项目级双重 RBAC 权限设计</div>
+    <div class="good">10 个 Django management commands 覆盖常见运维场景</div>
+  </div>
+</div>
+
+</div>
+
+<!-- ==================== 第七节: 综合评估 ==================== -->
+<div class="section" id="s7">
+<h2>7. 📊 综合评估与行动计划</h2>
+
+<h3>7.1 风险分布</h3>
+<div class="priority-chart">
+  <div class="bar crit">5<br>Critical</div>
+  <div class="bar high">8<br>High</div>
+  <div class="bar med">19<br>Medium</div>
+  <div class="bar low">13<br>Low</div>
+</div>
+
+<h3>7.2 按领域分布</h3>
+<table>
+  <tr><th>领域</th><th>严重</th><th>高危</th><th>中危</th><th>低危</th><th>合计</th></tr>
+  <tr><td>🔒 安全（认证/授权/CORS/凭据）</td><td>3</td><td>5</td><td>5</td><td>0</td><td><strong>13</strong></td></tr>
+  <tr><td>🐛 运行时 Bug（NameError/逻辑错误）</td><td>2</td><td>0</td><td>3</td><td>0</td><td><strong>5</strong></td></tr>
+  <tr><td>⚡ 性能（N+1/查询优化）</td><td>0</td><td>2</td><td>3</td><td>0</td><td><strong>5</strong></td></tr>
+  <tr><td>📝 代码质量（重复/过长/命名）</td><td>0</td><td>1</td><td>3</td><td>8</td><td><strong>12</strong></td></tr>
+  <tr><td>🏗 架构（耦合/单点/模块化）</td><td>0</td><td>0</td><td>5</td><td>2</td><td><strong>7</strong></td></tr>
+  <tr><td>🛡 错误处理（静默异常/裸except）</td><td>0</td><td>0</td><td>5</td><td>3</td><td><strong>8</strong></td></tr>
+</table>
+
+<h3>7.3 建议行动计划</h3>
+<table>
+  <tr><th>优先级</th><th>行动项</th><th>预计工作量</th></tr>
+  <tr style="background:#fff5f5">
+    <td><strong>P0 — 今天</strong></td>
+    <td>
+      1. 修复 auth_service.py 未导入异常<br>
+      2. 修复 projects/views/views.py NameError（6 个函数）<br>
+      3. 修复所有 CORS 漏洞（ai_views.py + api_testcase.py）<br>
+      4. 轮换所有 .env 中泄露的 API Key<br>
+      5. 移除 config.py 中硬编码的 internal_api_key 默认值
+    </td>
+    <td>~2 小时</td>
+  </tr>
+  <tr style="background:#fff8f1">
+    <td><strong>P1 — 本周</strong></td>
+    <td>
+      1. 从 LLM 提示词中移除管理员凭据<br>
+      2. 知识库 API 添加项目级权限检查<br>
+      3. get_user_view 等敏感接口添加权限控制<br>
+      4. 文件上传添加类型和大小限制<br>
+      5. ApiTestPermissionService 添加 active 过滤<br>
+      6. 测试模块序列化器 N+1 优化<br>
+      7. 密码重置改用 PasswordResetTokenGenerator
+    </td>
+    <td>~2 天</td>
+  </tr>
+  <tr>
+    <td><strong>P2 — 本迭代</strong></td>
+    <td>
+      1. 修复所有裸 except 和静默异常吞噬<br>
+      2. 拆分 900 行超长函数 / 消除重复代码<br>
+      3. SQL 查询优化（annotate、Q 对象、select_related）<br>
+      4. 审计日志敏感字段遮蔽改进<br>
+      5. 输入验证加强（int 转换、max_tokens 上限）<br>
+      6. 实现 test_connection 实际功能<br>
+      7. 限流参数合理化
+    </td>
+    <td>~3 天</td>
+  </tr>
+  <tr>
+    <td><strong>P3 — 下个迭代</strong></td>
+    <td>
+      1. 统一服务层返回值模式<br>
+      2. 清理死代码和调试日志<br>
+      3. 渐进式类型注解<br>
+      4. 代码组织优化（拆分大文件、统一命名）<br>
+      5. CI 添加安全扫描<br>
+      6. 评估 SQLite → PostgreSQL 迁移方案
+    </td>
+    <td>~5 天</td>
+  </tr>
+</table>
+
+<h3>7.4 总结</h3>
+<p style="line-height:2; margin-top:16px;">
+  该项目的<strong>架构设计思想是好的</strong>——分层清哳、异常体系统一、安全配置基线完善。
+  但在<strong>执行层面存在系统性问题</strong>：返回值模式不一致导致多处运行时崩溃、权限检查大面积缺失、
+  CORS 配置多处绕过白名单、代码重复严重。最紧迫的是 <strong>5 个运行时 Bug</strong>需要立即修复，
+  以及 <strong>.env 中的真实凭据</strong>需要立即轮换。
+</p>
+<p style="line-height:2; color:var(--text-secondary)">
+  建议按照上述 P0→P1→P2→P3 的顺序逐级修复，每级完成后运行全量测试验证。
+  修复完成后，应补充集成测试覆盖当前无测试的关键路径（如 SSE 流式 CORS、知识库权限检查）。
+</p>
+
+</div>
+
+</div>
+</body>
+</html>

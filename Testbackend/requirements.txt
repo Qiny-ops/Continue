@@ -1,6 +1,41 @@
-Django>=5.2,<6.0
-djangorestframework>=3.15
-django-cors-headers>=4.4
-django-filter>=24.2
-PyJWT>=2.8
+# Django 后端运行依赖（由 venv pip freeze 生成，已锁定可复现版本）
+# 注意：实际运行环境为 Django 6.0.3（原 requirements 的 <6.0 约束已过时，已修正）
+Django==6.0.3
+PyJWT==2.12.1
+PyYAML==6.0.3
+anyio==4.13.0
+asgiref==3.11.1
+attrs==26.1.0
+certifi==2026.2.25
+charset-normalizer==3.4.6
+colorama==0.4.6
+cryptography==50.0.0
+django-cors-headers==4.9.0
+django-filter==25.2
+djangorestframework==3.17.1
+drf-spectacular==0.29.0
+h11==0.16.0
+httpcore==1.0.9
+httpx==0.28.1
+idna==3.11
+inflection==0.5.1
+jsonschema-specifications==2025.9.1
+jsonschema==4.26.0
+numpy==2.4.5
+packaging==26.0
+pillow==12.1.1
+python-dotenv==1.2.2
+referencing==0.37.0
+requests==2.33.0
+rpds-py==0.30.0
+sqlparse==0.5.5
+typing_extensions==4.15.0
+tzdata==2025.3
+uritemplate==4.2.0
+urllib3==2.6.3
+
+# 生产 WSGI 服务器
 gunicorn>=22.0
+
+# 如需 PostgreSQL，取消下一行注释
+# psycopg2-binary>=2.9

@@ -10,6 +10,25 @@ from apps.core.response import StandardResponse
 from apps.core.permission_service import UnifiedPermissionService
 
 
+# ---- 内部辅助 ----
+
+def _resolve_project_id(kwargs):
+    """从视图 kwargs 中解析项目 ID，支持 project_identifier→project_id 自动转换。
+    原来三处装饰器(project_permission/member/admin)各复制了同一段 12 行转换逻辑。
+    """
+    project_id = kwargs.get('project_id')
+    project_identifier = kwargs.get('project_identifier')
+    if project_identifier and not project_id:
+        from apps.projects.repositories import ProjectRepository
+        project = ProjectRepository.get_by_identifier(project_identifier)
+        if project:
+            return project.id
+    return project_id
+
+
+# ---- 系统级权限装饰器 ----
+
+
 def require_system_permission(permission_code):
     """
     系统权限检查装饰器
@@ -100,17 +119,7 @@ def require_project_permission(permission_code):
     def decorator(view_func):
         @wraps(view_func)
         def wrapper(request, *args, **kwargs):
-            # 获取项目ID或标识符
-            project_id = kwargs.get('project_id')
-            project_identifier = kwargs.get('project_identifier')
-
-            # 如果是标识符，需要转换为ID
-            if project_identifier and not project_id:
-                from apps.projects.repositories import ProjectRepository
-                project = ProjectRepository.get_by_identifier(project_identifier)
-                if project:
-                    project_id = project.id
-
+            project_id = _resolve_project_id(kwargs)
             if not project_id:
                 return StandardResponse(message='无法确定项目', code=400)
 
@@ -161,17 +170,7 @@ def require_project_member(view_func):
     def wrapper(request, *args, **kwargs):
         from apps.core.permissions import ProjectPermissionService
 
-        # 获取项目ID或标识符
-        project_id = kwargs.get('project_id')
-        project_identifier = kwargs.get('project_identifier')
-
-        # 如果是标识符，需要转换为ID
-        if project_identifier and not project_id:
-            from apps.projects.repositories import ProjectRepository
-            project = ProjectRepository.get_by_identifier(project_identifier)
-            if project:
-                project_id = project.id
-
+        project_id = _resolve_project_id(kwargs)
         if not project_id:
             return StandardResponse(message='无法确定项目', code=400)
 
@@ -206,17 +205,7 @@ def require_project_admin(view_func):
     def wrapper(request, *args, **kwargs):
         from apps.core.permissions import ProjectPermissionService
 
-        # 获取项目ID或标识符
-        project_id = kwargs.get('project_id')
-        project_identifier = kwargs.get('project_identifier')
-
-        # 如果是标识符，需要转换为ID
-        if project_identifier and not project_id:
-            from apps.projects.repositories import ProjectRepository
-            project = ProjectRepository.get_by_identifier(project_identifier)
-            if project:
-                project_id = project.id
-
+        project_id = _resolve_project_id(kwargs)
         if not project_id:
             return StandardResponse(message='无法确定项目', code=400)
 

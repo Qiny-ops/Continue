@@ -14,6 +14,7 @@
 
 import logging
 from rest_framework import viewsets
+from django.db.models import Q
 from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
 from django_filters.rest_framework import DjangoFilterBackend
@@ -26,6 +27,8 @@ from apps.testcase.services import (
     RepositoryService, VersionService, ModuleService,
     TestCaseService, ReviewService, ExecutionService
 )
+from apps.testcase.models import TestCaseVersion
+from apps.projects.repositories import ProjectMemberRepository
 from apps.testcase.serializers import (
     TestCaseRepositorySerializer, TestCaseVersionSerializer,
     TestModuleSerializer, TestModuleTreeSerializer,
@@ -140,11 +143,13 @@ class TestModuleViewSet(viewsets.ModelViewSet):
         if not version_id:
             return StandardResponse(message='version parameter is required', code=400)
 
+        stat_type = request.query_params.get('stat_type', 'testcase')
+
         modules = ModuleService.get_modules_by_version(version_id)
         root_modules = ModuleService.build_tree(modules)
 
         # 预计算模块统计数据，避免序列化时的 N+1 查询
-        statistics = ModuleService.get_module_statistics(version_id)
+        statistics = ModuleService.get_module_statistics(version_id, stat_type=stat_type)
 
         serializer = TestModuleSerializer(
             root_modules,
@@ -160,7 +165,8 @@ class TestModuleViewSet(viewsets.ModelViewSet):
         if not version_id:
             return StandardResponse(message='version parameter is required', code=400)
 
-        statistics = ModuleService.get_module_statistics(version_id)
+        stat_type = request.query_params.get('stat_type', 'testcase')
+        statistics = ModuleService.get_module_statistics(version_id, stat_type=stat_type)
         return StandardResponse(data=statistics)
 
     @action(detail=False, methods=['post'])
@@ -179,6 +185,26 @@ class TestModuleViewSet(viewsets.ModelViewSet):
             return StandardResponse(message='ids parameter is required', code=400)
         if not version_id:
             return StandardResponse(message='version parameter is required', code=400)
+
+        # 校验版本存在性与归档冻结状态
+        version = TestCaseVersion.objects.filter(
+            id=version_id
+        ).select_related('repository__project').first()
+        if not version:
+            return StandardResponse(message='版本不存在', code=404)
+        if version.status == 'archived':
+            return StandardResponse(
+                message='该版本已归档，模块和测试用例已冻结，不可删除', code=400
+            )
+
+        # 权限校验：仅系统管理员、项目所有者或管理员可删除模块
+        project = version.repository.project
+        if not is_system_admin(request.user):
+            is_member, role, _ = ProjectMemberRepository.is_project_member(
+                project.id, request.user
+            )
+            if not is_member or role not in ('owner', 'admin'):
+                return StandardResponse(message='无权限删除该模块', code=403)
 
         deleted_modules_count, deleted_cases_count, error = ModuleService.batch_delete_modules(
             ids, version_id, delete_cases=delete_cases
@@ -205,7 +231,7 @@ class TestCaseViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated]
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
     filterset_fields = ['version', 'module', 'priority', 'automation_status', 'review_status']
-    search_fields = ['title', 'precondition', 'requirement']
+    search_fields = ['title', 'precondition']
     ordering_fields = ['created_at', 'updated_at', 'priority']
     ordering = ['-created_at']
 
@@ -263,11 +289,8 @@ class TestCaseViewSet(viewsets.ModelViewSet):
         search_query = request.query_params.get('search')
         if search_query:
             test_cases = test_cases.filter(
-                title__icontains=search_query
-            ) | test_cases.filter(
-                precondition__icontains=search_query
-            ) | test_cases.filter(
-                requirement__icontains=search_query
+                Q(title__icontains=search_query)
+                | Q(precondition__icontains=search_query)
             )
 
         # 应用优先级筛选
@@ -306,11 +329,8 @@ class TestCaseViewSet(viewsets.ModelViewSet):
         search_query = request.query_params.get('search')
         if search_query:
             test_cases = test_cases.filter(
-                title__icontains=search_query
-            ) | test_cases.filter(
-                precondition__icontains=search_query
-            ) | test_cases.filter(
-                requirement__icontains=search_query
+                Q(title__icontains=search_query)
+                | Q(precondition__icontains=search_query)
             )
 
         # 应用优先级筛选
@@ -350,11 +370,8 @@ class TestCaseViewSet(viewsets.ModelViewSet):
         search_query = request.query_params.get('search')
         if search_query:
             test_cases = test_cases.filter(
-                title__icontains=search_query
-            ) | test_cases.filter(
-                precondition__icontains=search_query
-            ) | test_cases.filter(
-                requirement__icontains=search_query
+                Q(title__icontains=search_query)
+                | Q(precondition__icontains=search_query)
             )
 
         # 应用优先级筛选
@@ -384,12 +401,9 @@ class TestCaseViewSet(viewsets.ModelViewSet):
         if not project_identifier:
             return StandardResponse(message='project parameter is required', code=400)
 
-        queryset, error = TestCaseService.get_test_cases_by_project(
+        queryset = TestCaseService.get_test_cases_by_project(
             project_identifier, request.user
         )
-        if error:
-            code = 404 if '不存在' in error else 403
-            return StandardResponse(message=error, code=code)
 
         if queryset is None:
             return StandardResponse(data=[])

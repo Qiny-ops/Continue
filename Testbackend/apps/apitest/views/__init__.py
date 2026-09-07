@@ -14,7 +14,8 @@ from apps.apitest.serializers import (
     ApiEnvironmentSerializer,
     ApiEnvironmentListSerializer
 )
-from apps.projects.models import Project, ProjectMember
+from apps.apitest.services import ApiTestPermissionService
+from apps.projects.models import Project
 
 
 class ApiEnvironmentViewSet(viewsets.ModelViewSet):
@@ -48,10 +49,13 @@ class ApiEnvironmentViewSet(viewsets.ModelViewSet):
                     return queryset.none()
             queryset = queryset.filter(project_id=project_id)
 
+        # 按用途类型过滤（接口测试 / Web 自动化）
+        target_type = self.request.query_params.get('target_type')
+        if target_type in ('api', 'web'):
+            queryset = queryset.filter(target_type=target_type)
+
         # 只返回用户有权限的项目环境
-        user_project_ids = ProjectMember.objects.filter(
-            user=self.request.user
-        ).values_list('project_id', flat=True)
+        user_project_ids = ApiTestPermissionService.get_user_project_ids(self.request.user)
 
         return queryset.filter(project_id__in=user_project_ids)
 
@@ -87,13 +91,61 @@ class ApiEnvironmentViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=['post'])
     def test_connection(self, request, pk=None):
         """测试环境连接"""
-        environment = self.get_object()
+        import logging
+        import urllib.parse
+        from urllib.request import Request, urlopen
+        from urllib.error import URLError
 
-        # TODO: 实现实际的连接测试
+        logger = logging.getLogger(__name__)
+        environment = self.get_object()
+        base_url = (environment.base_url or '').strip()
+
+        if not base_url:
+            return Response({
+                'success': False,
+                'message': '环境未配置 Base URL',
+            }, status=400)
+
+        parsed = urllib.parse.urlparse(base_url)
+        if parsed.scheme not in ('http', 'https'):
+            return Response({
+                'success': False,
+                'message': f'不支持的协议: {parsed.scheme}',
+            }, status=400)
+
+        # 健康检查路径：优先用 _health，回退到 /
+        for path in ('/_health', '/health', '/'):
+            try:
+                check_url = urllib.parse.urljoin(base_url, path)
+                req = Request(check_url, method='HEAD')
+                req.add_header('User-Agent', 'ApiTesting/1.0 HealthCheck')
+                with urlopen(req, timeout=5) as resp:
+                    logger.info(
+                        'Connection test to %s: HTTP %s (via %s)',
+                        environment.name, resp.status, check_url,
+                    )
+                    return Response({
+                        'success': True,
+                        'message': f'环境 {environment.name} 连接正常 (HTTP {resp.status})',
+                        'detail': {
+                            'checked_url': check_url,
+                            'status_code': resp.status,
+                        },
+                    })
+            except URLError as e:
+                logger.warning('Connection test %s → %s failed: %s', environment.name, check_url, e)
+                continue
+            except Exception:
+                logger.warning(
+                    'Connection test %s → %s failed unexpectedly',
+                    environment.name, check_url, exc_info=True,
+                )
+                continue
+
         return Response({
-            'success': True,
-            'message': f'环境 {environment.name} 连接正常'
-        })
+            'success': False,
+            'message': f'环境 {environment.name} 连接失败: 无法访问 {base_url}',
+        }, status=502)
 
 
 # 导入其他视图

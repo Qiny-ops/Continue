@@ -158,6 +158,7 @@
 import { ref } from 'vue'
 import { VideoPlay, Edit, Delete, Folder, MoreFilled, CopyDocument, List } from '@element-plus/icons-vue'
 import { useTestCaseFormatters } from '@/composables/testcase/useTestCaseFormatters'
+import { getAvatarUrl } from '@/utils/avatar.js'
 
 const tableRef = ref(null)
 const avatarErrors = ref({})
@@ -204,21 +205,6 @@ const getReviewStatusText = (status) => REVIEW_STATUS_TEXT[status] || '已通过
 const getAvatarText = (name) => {
   if (!name) return '?'
   return name.charAt(0).toUpperCase()
-}
-
-const getAvatarUrl = (avatar) => {
-  if (!avatar) return ''
-  if (avatar.startsWith('http://') || avatar.startsWith('https://')) {
-    return avatar
-  }
-  const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000'
-  if (avatar.startsWith('/avatars/')) {
-    return `${baseUrl}/media${avatar}`
-  }
-  if (avatar.startsWith('/')) {
-    return `${baseUrl}${avatar}`
-  }
-  return `${baseUrl}/media/${avatar}`
 }
 
 const handleAvatarError = (caseId) => {

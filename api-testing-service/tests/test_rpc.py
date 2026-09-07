@@ -12,8 +12,9 @@ from app.main import app
 
 @pytest.fixture
 def client():
-    """创建测试客户端"""
-    return TestClient(app)
+    """创建测试客户端（使用 with 触发 lifespan，初始化 engine 等资源）"""
+    with TestClient(app) as c:
+        yield c
 
 
 def test_root(client):

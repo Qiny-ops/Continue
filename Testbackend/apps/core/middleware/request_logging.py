@@ -40,8 +40,9 @@ class RequestLoggingMiddleware:
         duration = time.time() - start_time
 
         user_info = 'Anonymous'
-        if hasattr(request, 'user') and request.user.is_authenticated:
-            user_info = f'{request.user.username}(id={request.user.id})'
+        user = getattr(request, 'user', None)
+        if user is not None and user.is_authenticated:
+            user_info = f'{user.username}(id={user.id})'
 
         log_message = (
             f'[{request.method}] {request.path} '

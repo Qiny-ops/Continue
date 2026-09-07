@@ -46,12 +46,15 @@
 
           <!-- 项目详情内容 -->
           <div v-else-if="project" class="project-content">
-            <!-- 动态内容模块 -->
-            <component
-              :is="currentComponent"
-              v-if="currentComponent"
-              :project="project"
-            />
+            <!-- KeepAlive 缓存标签页组件，避免每次切换都重新加载 JS chunk -->
+            <KeepAlive>
+              <component
+                :is="currentComponent"
+                v-if="currentComponent"
+                :project="project"
+                :key="activeTab"
+              />
+            </KeepAlive>
           </div>
         </div>
       </main>
@@ -81,7 +84,9 @@ const project = computed(() => projectStore.currentProject)
 const TAB_TO_ROUTE = {
   overview: '',
   testcases: '/testcases',
+  requirements: '/requirements',
   apitest: '/apitest',
+  environments: '/environments',
   knowledge: '/knowledge',
   settings: '/settings'
 }
@@ -93,8 +98,9 @@ const ROUTE_TO_TAB = Object.fromEntries(
 const COMPONENT_MAP = {
   overview: defineAsyncComponent(() => import('./components/ProjectOverview.vue')),
   testcases: defineAsyncComponent(() => import('./components/ProjectTestCases.vue')),
+  requirements: defineAsyncComponent(() => import('@/views/requirements/Index.vue')),
   apitest: defineAsyncComponent(() => import('@/views/apitest/Index.vue')),
-  'apitest-environments': defineAsyncComponent(() => import('@/views/apitest/Environment.vue')),
+  'environments': defineAsyncComponent(() => import('@/views/apitest/Environment.vue')),
   knowledge: defineAsyncComponent(() => import('@/views/knowledge/Index.vue')),
   settings: defineAsyncComponent(() => import('./Settings.vue')),
   'manage-repo': defineAsyncComponent(() => import('@/views/testcase/ManageRepo.vue')),
@@ -113,9 +119,9 @@ const setActiveTabFromRoute = () => {
     activeTab.value = 'manage-repo'
   } else if (path.includes('/t/manage-version')) {
     activeTab.value = 'manage-version'
-  } else if (path.includes('/apitest/environments')) {
-    // 环境管理路由
-    activeTab.value = 'apitest-environments'
+  } else if (path.includes('/environments')) {
+    // 环境管理路由（侧边栏独立项）
+    activeTab.value = 'environments'
   } else if (path.includes('/apitest')) {
     // 接口测试路由
     activeTab.value = 'apitest'

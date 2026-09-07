@@ -65,6 +65,8 @@ INSTALLED_APPS = [
     "apps.testcase",
     "apps.knowledge",
     "apps.apitest",
+    "apps.webauto",
+    "apps.requirement",
 ]
 
 MIDDLEWARE = [
@@ -108,6 +110,9 @@ CORS_ALLOW_HEADERS = [
 ]
 
 CORS_EXPOSE_HEADERS = ['Content-Disposition']
+
+# 允许携带凭证（与白名单来源配合；不允许 '*'，避免凭证泄露）
+CORS_ALLOW_CREDENTIALS = True
 
 ROOT_URLCONF = "Testbackend.urls"
 
@@ -217,22 +222,32 @@ else:
     )
 JWT_EXPIRATION_HOURS = int(os.environ.get('JWT_EXPIRATION_HOURS', 24))
 
+# 凭据字段对称加密密钥（Fernet）
+# 生产环境必须设置为独立的合法 Fernet key（cryptography.fernet.Fernet.generate_key()）；
+# 未设置时由 SECRET_KEY 确定性派生（仅开发可用，密钥轮换会无法解密历史数据）。
+DB_FIELD_ENCRYPTION_KEY = os.environ.get('DB_FIELD_ENCRYPTION_KEY', '')
+
 # Frontend URL Configuration
 FRONTEND_URL = os.environ.get('FRONTEND_URL', 'http://localhost:5173')
 
 # WeKnora Knowledge Base Configuration
 WEKNORA_BASE_URL = os.environ.get('WEKNORA_BASE_URL', 'http://127.0.0.1:3000/api/v1')
 WEKNORA_API_KEY = os.environ.get('WEKNORA_API_KEY', '')
-if not WEKNORA_API_KEY:
+# 已知的占位符/示例值，不能作为真实 Key 使用
+_WEKNORA_PLACEHOLDER_KEYS = {
+    'your_weknora_api_key_here', 'your-weknora-api-key', 'change-me',
+    'changeme', 'placeholder', 'test', 'xxxx',
+}
+if not WEKNORA_API_KEY or WEKNORA_API_KEY.lower() in _WEKNORA_PLACEHOLDER_KEYS:
     if DEBUG:
         warnings.warn(
-            "WEKNORA_API_KEY 环境变量未设置，知识库功能将无法使用。"
-            "请设置 WEKNORA_API_KEY 环境变量！",
+            "WEKNORA_API_KEY 未设置或仍为占位符，知识库功能将无法使用"
+            "（WeKnora 会返回 401）。请在 .env 中配置真实的 WEKNORA_API_KEY！",
             RuntimeWarning
         )
     else:
         raise ValueError(
-            "生产环境必须设置 WEKNORA_API_KEY 环境变量！"
+            "生产环境必须设置有效的 WEKNORA_API_KEY 环境变量（当前为空或占位符）！"
         )
 
 # WeKnora 默认模型配置
@@ -253,6 +268,14 @@ AI_CLIENT_THREAD_POOL_SIZE = int(os.environ.get('AI_CLIENT_THREAD_POOL_SIZE', 10
 # API Testing Service Configuration (接口测试微服务)
 API_TESTING_SERVICE_URL = os.environ.get('API_TESTING_SERVICE_URL', 'http://localhost:8002')
 API_TESTING_SERVICE_TIMEOUT = int(os.environ.get('API_TESTING_SERVICE_TIMEOUT', 120))
+# 调用 api-testing-service 时携带的 API Key（需与微服务侧 API_TESTING_API_KEY 配置一致；为空=开发模式不强制）
+API_TESTING_API_KEY = os.environ.get('API_TESTING_API_KEY', '')
+
+# Web Automation Service Configuration (Web 自动化微服务)
+WEB_AUTOMATION_SERVICE_URL = os.environ.get('WEB_AUTOMATION_SERVICE_URL', 'http://localhost:8003')
+WEB_AUTOMATION_SERVICE_TIMEOUT = int(os.environ.get('WEB_AUTOMATION_SERVICE_TIMEOUT', 180))
+# 调用 web-automation-service 时携带的 API Key（需与微服务侧 API_KEY 配置一致；为空=开发模式不强制）
+WEB_AUTOMATION_API_KEY = os.environ.get('WEB_AUTOMATION_API_KEY', '')
 
 # OpenAI Embedding Configuration (用于用例去重)
 OPENAI_API_KEY = os.environ.get('OPENAI_API_KEY', '')

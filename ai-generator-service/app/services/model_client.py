@@ -9,10 +9,14 @@ import asyncio
 import time
 from typing import Any, AsyncGenerator, Tuple
 
+import httpx
 from openai import AsyncOpenAI
 
 from app.config import get_settings
 from app.utils.json_extractor import extract_and_parse
+from app.utils.logger import get_logger
+
+logger = get_logger(__name__)
 
 
 class ModelClient:
@@ -29,17 +33,22 @@ class ModelClient:
             cls._instance = AsyncOpenAI(
                 api_key=settings.model_api_key,
                 base_url=settings.model_base_url,
+                timeout=httpx.Timeout(120.0, connect=10.0),
             )
         return cls._instance
 
     @classmethod
     async def get_model_id(cls) -> str:
-        """获取可用模型 ID"""
+        """获取可用模型 ID（模型端点不可达时返回空，交由调用方走错误契约）"""
         if cls._model_id is None:
-            client = cls.get_client()
-            models = await client.models.list()
-            if models.data:
-                cls._model_id = models.data[0].id
+            try:
+                client = cls.get_client()
+                models = await client.models.list()
+                if models.data:
+                    cls._model_id = models.data[0].id
+            except Exception as e:
+                logger.error(f"获取模型列表失败: {e}")
+                return ""
         return cls._model_id or ""
 
     @classmethod
@@ -136,6 +145,9 @@ class ModelClient:
                 if chunk.choices and chunk.choices[0].delta.content:
                     yield chunk.choices[0].delta.content
 
+        except asyncio.CancelledError:
+            logger.info("流式推理被取消（客户端断连）")
+            raise  # 必须重新抛出，让 Starlette 知道连接已关闭
         except Exception as e:
             yield f"[错误] API 调用失败: {str(e)}"
 

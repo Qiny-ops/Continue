@@ -5,7 +5,6 @@ JSON解析工具
 """
 import json
 import re
-import ast
 import logging
 from typing import Tuple, Any, Optional
 
@@ -77,25 +76,28 @@ class JSONParser:
                     try:
                         obj = json.loads(obj_text)
                         parsed_objects.append(obj)
-                    except:
+                    except json.JSONDecodeError:
                         # 尝试修复单个对象
                         fixed_obj = JSONParser._fix_json_errors(obj_text)
                         try:
                             obj = json.loads(fixed_obj)
                             parsed_objects.append(obj)
-                        except:
+                        except json.JSONDecodeError:
                             continue
                 if parsed_objects:
                     return True, parsed_objects, None
         except Exception:
             pass
 
-        # 尝试使用ast.literal_eval
+        # 最后尝试：将双引号替换为单引号后重试 json.loads
+        # 注意：ast.literal_eval 对不可信 LLM 输出存在安全隐患（可解析非 JSON 类型），
+        # 改用受限的 json.loads 重试策略
         try:
             text4 = processed_text.replace('"', "'")
-            result = ast.literal_eval(text4)
-            return True, result, None
-        except Exception:
+            result = json.loads(text4)
+            if isinstance(result, (dict, list)):
+                return True, result, None
+        except (json.JSONDecodeError, ValueError):
             pass
 
         logger.warning(f"JSON解析失败: {first_error}, 原始文本前200字符: {processed_text[:200]}")

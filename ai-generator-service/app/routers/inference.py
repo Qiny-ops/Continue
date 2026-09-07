@@ -31,6 +31,9 @@ from app.utils.logger import get_logger
 router = APIRouter(prefix="/api/v1", tags=["inference"])
 logger = get_logger(__name__)
 
+# 保活后台批量任务，避免被事件循环 GC 回收导致任务永久停在 PROCESSING
+_background_tasks: set = set()
+
 # 初始化引擎
 engine = InferenceEngine()
 
@@ -94,7 +97,11 @@ async def infer_stream(request: InferRequest):
 
     async def generate():
         async for chunk in engine.infer_stream(messages):
-            yield f"data: {chunk}\n\n"
+            # SSE 要求每行单独加 "data: " 前缀；chunk 内含换行时必须拆分，
+            # 否则换行后的内容会被客户端当作无效字段丢弃（静默丢内容）
+            for line in chunk.split("\n"):
+                yield f"data: {line}\n"
+            yield "\n"
         yield "data: [DONE]\n\n"
 
     return StreamingResponse(generate(), media_type="text/event-stream")
@@ -143,7 +150,9 @@ async def async_batch_infer(request: BatchRequest):
     logger.info(f"异步批量推理请求，数量: {len(request.items)}")
 
     task_id = await TaskStore.create_task(total=len(request.items))
-    asyncio.create_task(_process_batch(task_id, request))
+    task = asyncio.create_task(_process_batch(task_id, request))
+    _background_tasks.add(task)
+    task.add_done_callback(_background_tasks.discard)
 
     logger.info(f"创建异步任务: {task_id}")
     return AsyncBatchResponse(task_id=task_id)
@@ -191,7 +200,7 @@ async def _process_batch(task_id: str, request: BatchRequest):
                 "error": error,
             })
 
-            await TaskStore.update_task(task_id, completed=i + 1, results=results)
+            await TaskStore.update_task(task_id, completed=i + 1, results=list(results))
 
         await TaskStore.update_task(task_id, status=TaskStatus.COMPLETED, results=results)
         logger.info(f"批量任务完成: {task_id}")

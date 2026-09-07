@@ -82,6 +82,17 @@ export default [
       },
 
       {
+        path: 'requirements',
+        name: ROUTE_NAMES.PROJECT_REQUIREMENTS,
+        component: () => import('@/views/requirements/Index.vue'),
+        meta: {
+          title: '需求管理',
+          requiresAuth: true,
+          keepAlive: true
+        }
+      },
+
+      {
         path: 'apitest',
         name: ROUTE_NAMES.PROJECT_APITEST,
         component: () => import('@/views/apitest/Index.vue'),
@@ -93,7 +104,7 @@ export default [
       },
 
       {
-        path: 'apitest/environments',
+        path: 'environments',
         name: ROUTE_NAMES.PROJECT_APITEST_ENVIRONMENTS,
         component: () => import('@/views/apitest/Environment.vue'),
         meta: {

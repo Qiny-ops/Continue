@@ -113,8 +113,9 @@ class AuditLogMiddleware:
         return False
 
     def _get_user_info(self, request):
-        if hasattr(request, 'user') and request.user.is_authenticated:
-            return f"{request.user.username}(id={request.user.id})"
+        user = getattr(request, 'user', None)
+        if user is not None and user.is_authenticated:
+            return f"{user.username}(id={user.id})"
         return 'Anonymous'
 
     def _get_client_ip(self, request):
@@ -130,7 +131,7 @@ class AuditLogMiddleware:
             # 对于 DRF 请求，尝试从 request.data 获取
             if hasattr(request, 'data') and request.data:
                 body = dict(request.data) if isinstance(request.data, dict) else request.data
-                sensitive_fields = ['password', 'token', 'secret', 'key']
+                sensitive_fields = ['password', 'token', 'secret', 'key', 'api_key', 'access_token', 'refresh_token', 'authorization']
                 for field in sensitive_fields:
                     if field in body:
                         body[field] = '******'
@@ -138,7 +139,7 @@ class AuditLogMiddleware:
             # 尝试从 request.body 获取
             if request.body:
                 body = json.loads(request.body.decode('utf-8'))
-                sensitive_fields = ['password', 'token', 'secret', 'key']
+                sensitive_fields = ['password', 'token', 'secret', 'key', 'api_key', 'access_token', 'refresh_token', 'authorization']
                 for field in sensitive_fields:
                     if field in body:
                         body[field] = '******'

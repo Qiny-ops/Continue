@@ -111,7 +111,8 @@ class KBClient:
         session_id: str,
         kb_id: str,
         kb_api_key: Optional[str] = None,
-        knowledge_id: Optional[str] = None
+        knowledge_id: Optional[str] = None,
+        temperature: Optional[float] = None
     ):
         """
         调用 Agent 对话流式问答
@@ -156,7 +157,7 @@ class KBClient:
             "knowledge_ids": [knowledge_id] if knowledge_id else [],
             "mentioned_items": mentioned_items,
             "agent_id": self.agent_id,
-            "temperature": self.temperature,
+            "temperature": temperature if temperature is not None else self.temperature,
             "max_tokens": self.max_tokens,
         }
 

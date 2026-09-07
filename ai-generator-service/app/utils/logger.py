@@ -1,17 +1,25 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-统一日志模块
-"""
+日志模块
 
+默认输出到 stderr（MCP 协议兼容），可通过 LOG_STREAM 环境变量切换。
+"""
 import logging
+import os
 import sys
 from typing import Optional
-
 
 # 日志格式
 LOG_FORMAT = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 DATE_FORMAT = "%Y-%m-%d %H:%M:%S"
+
+
+def _get_log_stream():
+    """确定日志输出流：默认 stderr（MCP 安全），可设 LOG_STREAM=stdout 切回 stdout"""
+    if os.environ.get("LOG_STREAM", "").lower() == "stdout":
+        return sys.stdout
+    return sys.stderr
 
 
 def get_logger(name: Optional[str] = None, level: int = logging.INFO) -> logging.Logger:
@@ -33,8 +41,7 @@ def get_logger(name: Optional[str] = None, level: int = logging.INFO) -> logging
 
     logger.setLevel(level)
 
-    # 控制台输出
-    console_handler = logging.StreamHandler(sys.stdout)
+    console_handler = logging.StreamHandler(_get_log_stream())
     console_handler.setLevel(level)
     console_handler.setFormatter(logging.Formatter(LOG_FORMAT, DATE_FORMAT))
 
@@ -50,5 +57,4 @@ def set_log_level(level: int):
         handler.setLevel(level)
 
 
-# 模块级日志记录器
 service_logger = get_logger("ai-generator-service")

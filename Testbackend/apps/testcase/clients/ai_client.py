@@ -117,7 +117,7 @@ class OpenAIEmbeddingClient:
                     error_detail = ""
                     try:
                         error_detail = response.json()
-                    except:
+                    except (ValueError, Exception):
                         error_detail = response.text
                     raise AIServiceError(f"Embedding API 错误: {response.status_code}, 详情: {error_detail}", "EMBEDDING_ERROR")
 
@@ -392,6 +392,7 @@ class AITestCaseClient:
                 response = await client.get("/api/v1/health")
                 return response.status_code == 200
         except Exception:
+            logger.warning("AI service health check failed", exc_info=True)
             return False
 
     async def get_service_info(self) -> Optional[dict]:
@@ -626,6 +627,7 @@ class AITestCaseClient:
                     "tags": case.get("tags", []),
                 })
             except Exception:
+                logger.warning(f"跳过无效测试用例: {case.get('title', 'unknown')}", exc_info=True)
                 continue
 
         yield {"type": "done", "cases": normalized_cases}
@@ -699,7 +701,7 @@ class AsyncEventLoopManager:
                 try:
                     new_loop.run_until_complete(new_loop.shutdown_asyncgens())
                 except Exception:
-                    pass
+                    logger.debug("事件循环清理异常（可忽略）", exc_info=True)
                 new_loop.close()
 
         try:
@@ -767,7 +769,7 @@ class AITestCaseClientSync:
                 try:
                     new_loop.run_until_complete(new_loop.shutdown_asyncgens())
                 except Exception:
-                    pass
+                    logger.debug("事件循环清理异常（可忽略）", exc_info=True)
                 new_loop.close()
 
         # 在线程池中运行

@@ -60,6 +60,12 @@ urlpatterns = [
 
     # 接口测试管理接口
     path("api/apitest/", include("apps.apitest.urls")),
+
+    # Web 自动化管理接口
+    path("api/webauto/", include("apps.webauto.urls")),
+
+    # 需求管理接口
+    path("api/requirements/", include("apps.requirement.urls")),
 ]
 
 # ==================== 开发环境配置 ====================

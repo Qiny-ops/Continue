@@ -12,7 +12,7 @@ from django.conf import settings
 
 from apps.users.models import User, TokenBlacklist
 from apps.users.repositories import TokenRepository
-from apps.core.exceptions import ValidationError, AuthenticationError
+from apps.core.exceptions import ValidationError, AuthenticationError, BusinessError, NotFoundError
 
 logger = logging.getLogger(__name__)
 
@@ -65,10 +65,24 @@ class AuthService:
 
     @staticmethod
     def update_login_info(user, ip_address):
-        """更新用户登录信息"""
-        user.last_login_time = timezone.now()
-        user.last_login_ip = ip_address
-        user.save(update_fields=['last_login_time', 'last_login_ip'])
+        """更新用户登录信息（非关键副作用，失败不应阻断登录）
+
+        使用 queryset.update() 而非 model.save(update_fields=...)：跨进程架构下
+        (api-testing-service 经 HTTP 调用 Django 登录接口) 无法把注册/登录/清理纳入同一事务，
+        测试账号在 authenticate 成功到本调用之间可能被删除（用例自带删除步骤、或并发
+        cleanup 交错）。model.save() 在行已缺失时会抛 Django 5.1+ 的 NotUpdated 使登录 500；
+        queryset.update() 影响 0 行时静默返回 0，从根上消除该异常路径，同时保留告警可见性。
+        """
+        affected = User.objects.filter(pk=user.pk).update(
+            last_login_time=timezone.now(),
+            last_login_ip=ip_address,
+        )
+        if affected == 0:
+            # 账号可能已在登录前被清理/删除，登录信息更新为非关键操作，不应让登录 500
+            logger.warning(
+                'update_login_info 未影响任何行（账号可能已被删除/并发清理），已忽略。user=%s',
+                getattr(user, 'username', None) or user.pk,
+            )
 
     @staticmethod
     def login(username, password, request=None):
@@ -111,15 +125,15 @@ class AuthService:
         """
         payload = AuthService.verify_token(token)
         if not payload:
-            return None, 'Token无效或已过期'
+            raise BusinessError('Token无效或已过期')
 
         try:
             user = User.objects.get(id=payload.get('user_id'))
         except User.DoesNotExist:
-            return None, '用户不存在'
+            raise NotFoundError('用户不存在')
 
         if user.status != 'active':
-            return None, '用户已被禁用'
+            raise BusinessError('用户已被禁用')
 
         # 将旧 token 加入黑名单
         old_jti = payload.get('jti')

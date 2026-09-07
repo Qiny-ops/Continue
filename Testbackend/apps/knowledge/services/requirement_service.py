@@ -7,6 +7,7 @@ import logging
 from typing import Dict, Any, List, Optional, Tuple
 
 from apps.knowledge.repositories.weknora_repository import weknora_repository
+from apps.knowledge.services.agent_service import AgentService
 from apps.core.utils.json_parser import JSONParser
 
 logger = logging.getLogger(__name__)
@@ -109,22 +110,8 @@ class RequirementService:
         knowledge_base_ids: List[str],
         knowledge_ids: List[str],
     ) -> List[Dict[str, Any]]:
-        """构建mentioned_items数组"""
-        items = []
-
-        for kb_id in knowledge_base_ids:
-            items.append({
-                'id': kb_id,
-                'name': f"KB-{kb_id[-8:]}",
-                'type': 'kb',
-                'kb_type': 'document'
-            })
-
-        for k_id in knowledge_ids:
-            items.append({
-                'id': k_id,
-                'name': f"File-{k_id[-8:]}",
-                'type': 'file'
-            })
-
-        return items
+        """构建mentioned_items数组（委托给 AgentService 避免重复）"""
+        return AgentService.build_mentioned_items(
+            knowledge_base_ids=knowledge_base_ids,
+            knowledge_ids=knowledge_ids,
+        )

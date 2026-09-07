@@ -67,15 +67,66 @@ class WeKnoraRepository:
             if raw_response:
                 return response
 
-            result = response.json()
+            # ---- 解析响应（兼容非 JSON / 异常结构）----
+            try:
+                result = response.json()
+            except (ValueError, json.JSONDecodeError):
+                # 上游返回了非 JSON 内容（网关错误页、HTML 等）
+                body = (response.text or '')[:200]
+                if response.status_code in (401, 403):
+                    return {
+                        'success': False,
+                        'error': 'WeKnora 认证失败：API Key 无效或未配置',
+                        'code': 'AUTH_ERROR',
+                        'http_status': 502,
+                    }
+                if response.status_code >= 500:
+                    return {
+                        'success': False,
+                        'error': f'WeKnora 服务异常（HTTP {response.status_code}）',
+                        'code': 'UPSTREAM_ERROR',
+                        'http_status': 502,
+                    }
+                return {
+                    'success': False,
+                    'error': body or f'未知错误（HTTP {response.status_code}）',
+                    'code': 'UNKNOWN_ERROR',
+                    'http_status': 500,
+                }
+
+            # 防御：个别实现可能返回非 dict（如字符串/列表）
+            if not isinstance(result, dict):
+                return {
+                    'success': False,
+                    'error': (str(result) or f'未知错误（HTTP {response.status_code}）')[:200],
+                    'code': 'UNKNOWN_ERROR',
+                    'http_status': 500,
+                }
 
             if not result.get('success', False):
                 error = result.get('error', {})
-                logger.error(f"WeKnora API 错误: {error}")
+                # error 可能是字符串，也可能是 {message, code} 字典
+                if isinstance(error, dict):
+                    message = error.get('message') or error.get('detail') or '未知错误'
+                    code = error.get('code', 'UNKNOWN_ERROR')
+                else:
+                    message = str(error)
+                    code = 'UPSTREAM_ERROR'
+                # 结合 HTTP 状态码给出更精准的归类，便于前端/运维定位
+                if response.status_code in (401, 403):
+                    message = f'WeKnora 认证失败：{message}'
+                    code = 'AUTH_ERROR'
+                    http_status = 502
+                elif response.status_code >= 500:
+                    http_status = 502
+                else:
+                    http_status = 500
+                logger.error(f"WeKnora API 错误: {message}")
                 return {
                     'success': False,
-                    'error': error.get('message', '未知错误'),
-                    'code': error.get('code', 'UNKNOWN_ERROR')
+                    'error': message,
+                    'code': code,
+                    'http_status': http_status,
                 }
 
             return {
@@ -85,16 +136,16 @@ class WeKnoraRepository:
 
         except requests.exceptions.Timeout:
             logger.error(f"WeKnora API 请求超时: {url}")
-            return {'success': False, 'error': '请求超时', 'code': 'TIMEOUT'}
+            return {'success': False, 'error': '请求超时', 'code': 'TIMEOUT', 'http_status': 504}
         except requests.exceptions.ConnectionError:
             logger.error(f"WeKnora API 连接错误: {url}")
-            return {'success': False, 'error': '无法连接到 WeKnora 服务', 'code': 'CONNECTION_ERROR'}
+            return {'success': False, 'error': '无法连接到 WeKnora 服务', 'code': 'CONNECTION_ERROR', 'http_status': 503}
         except requests.exceptions.RequestException as e:
             logger.error(f"WeKnora API 请求异常: {str(e)}")
-            return {'success': False, 'error': str(e), 'code': 'REQUEST_ERROR'}
+            return {'success': False, 'error': str(e), 'code': 'REQUEST_ERROR', 'http_status': 502}
         except Exception as e:
             logger.error(f"WeKnora API 未知错误: {str(e)}")
-            return {'success': False, 'error': str(e), 'code': 'UNKNOWN_ERROR'}
+            return {'success': False, 'error': str(e), 'code': 'UNKNOWN_ERROR', 'http_status': 500}
 
     # ==================== 知识库管理 ====================
 

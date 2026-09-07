@@ -137,9 +137,15 @@
                 </div>
                 <div class="activity-content">
                   <div class="activity-title">
-                    <span class="activity-user">{{ activity.userName || '用户' }}</span>
-                    {{ getActivityAction(activity.type) }}
-                    <span class="activity-target">{{ activity.targetName }}</span>
+                    <template v-if="activity.title">
+                      <span class="activity-user">{{ activity.userName || '用户' }}</span>
+                      <span>{{ activity.title }}</span>
+                    </template>
+                    <template v-else>
+                      <span class="activity-user">{{ activity.userName || '用户' }}</span>
+                      {{ getActivityAction(activity.type) }}
+                      <span class="activity-target">{{ activity.targetName }}</span>
+                    </template>
                   </div>
                   <div class="activity-time">{{ formatActivityTime(activity.createdAt) }}</div>
                 </div>
@@ -242,7 +248,8 @@ const getActivityIcon = (type) => {
     create: Plus,
     update: Edit,
     delete: Delete,
-    view: View
+    view: View,
+    execute: View
   }
   return icons[type] || Document
 }
@@ -252,7 +259,8 @@ const getActivityAction = (type) => {
     create: '创建了',
     update: '更新了',
     delete: '删除了',
-    view: '查看了'
+    view: '查看了',
+    execute: '执行了'
   }
   return actions[type] || '操作了'
 }
@@ -321,14 +329,19 @@ const fetchActivities = async () => {
   try {
     const res = await projectApi.getProjectActivities(props.project.code)
     if (res?.data) {
-      activities.value = res.data.activities || res.data || []
+      const raw = res.data.activities || res.data || []
+      activities.value = raw.map((a) => ({
+        id: a.id,
+        type: a.type,
+        userName: a.user || a.userName || '用户',
+        targetName: a.targetName || '',
+        title: a.title || '',
+        createdAt: a.createdAt || a.time,
+      }))
     }
   } catch {
-    activities.value = [
-      { id: 1, type: 'create', userName: '管理员', targetName: '测试用例库', createdAt: new Date(Date.now() - 3600000) },
-      { id: 2, type: 'update', userName: '测试人员', targetName: '登录模块用例', createdAt: new Date(Date.now() - 7200000) },
-      { id: 3, type: 'view', userName: '开发人员', targetName: '项目概览', createdAt: new Date(Date.now() - 86400000) }
-    ]
+    // 接口异常时不回退假数据，展示空态
+    activities.value = []
   } finally {
     activitiesLoading.value = false
   }
@@ -675,6 +688,11 @@ onMounted(() => {
 .activity-icon.view {
   background: var(--color-bg-tertiary);
   color: var(--color-text-secondary);
+}
+
+.activity-icon.execute {
+  background: var(--color-success-light);
+  color: var(--color-success);
 }
 
 .activity-content {

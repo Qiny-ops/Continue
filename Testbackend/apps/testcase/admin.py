@@ -40,7 +40,7 @@ class TestCaseAdmin(admin.ModelAdmin):
         'automation_status', 'created_by', 'created_at'
     ]
     list_filter = ['priority', 'automation_status', 'created_at']
-    search_fields = ['title', 'precondition', 'requirement', 'steps', 'expected_result']
+    search_fields = ['title', 'precondition', 'requirement__title', 'steps', 'expected_result']
     raw_id_fields = ['module', 'version', 'created_by', 'updated_by']
 
 

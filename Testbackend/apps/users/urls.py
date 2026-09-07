@@ -27,7 +27,7 @@ urlpatterns = [
     # 忘记密码
     path('forgot-password/', forgot_password_view, name='forgot_password'),
     # 重置密码
-    path('reset-password/<str:token>/', reset_password_view, name='reset_password'),
+    path('reset-password/<str:user_id>/<str:token>/', reset_password_view, name='reset_password'),
 
     # ==================== 用户信息管理 ====================
     # 获取用户列表

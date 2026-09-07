@@ -49,10 +49,6 @@ class Project(models.Model):
 
     owner = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='owned_projects', verbose_name='项目负责人')
     created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='created_projects', verbose_name='创建者')
-    test_cases = models.IntegerField(default=0, verbose_name='测试用例数')
-    test_plans = models.IntegerField(default=0, verbose_name='测试计划数')
-    bugs = models.IntegerField(default=0, verbose_name='缺陷数')
-
     knowledge_base_id = models.CharField(max_length=100, blank=True, null=True, verbose_name='知识库ID', help_text='关联的WeKnora知识库ID')
     knowledge_base_name = models.CharField(max_length=255, blank=True, null=True, verbose_name='知识库名称', help_text='知识库显示名称')
 

@@ -5,6 +5,15 @@ import { createSSEStream } from '@/utils/sse.js'
 
 const BASE_URL = '/apitest'
 
+const validateParams = (params) => {
+  return typeof params === 'object' && params !== null ? params : {}
+}
+
+const validateId = (id) => {
+  if (!id) throw new Error('ID不能为空')
+  return id
+}
+
 /**
  * API 测试环境管理
  */
@@ -144,12 +153,12 @@ const apiTestCaseApi = {
     }
   },
 
-  executeCaseStream(id, environmentId, onMessage, onError, onComplete) {
+  executeCaseStream(id, environmentId, onMessage, onError, onComplete, extraData = {}) {
     const url = `${axios.defaults.baseURL}${BASE_URL}/cases/${id}/execute/`
 
     return createSSEStream({
       url,
-      data: { environment_id: environmentId },
+      data: { environment_id: environmentId, ...extraData },
       callbacks: {
         onEvent(eventName, parsed) {
           // executeCaseStream 的 SSE 只有 data 行，无 event 行

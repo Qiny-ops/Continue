@@ -113,6 +113,9 @@ export class Project {
     this.isOwner = Boolean(data.isOwner)
     this.role = this._normalizeString(data.role || 'viewer')
     this.testCases = this._normalizeNumber(data.testCases || data.testCaseCount)
+    this.repositories = this._normalizeNumber(data.repositories || data.repositoryCount)
+    this.versions = this._normalizeNumber(data.versions || data.versionCount)
+    this.modules = this._normalizeNumber(data.modules || data.moduleCount)
     this.testPlans = this._normalizeNumber(data.testPlans)
     this.bugs = this._normalizeNumber(data.bugs)
     this.knowledgeBaseId = this._normalizeString(data.knowledgeBaseId || data.knowledge_base_id || '')
@@ -152,7 +155,8 @@ export class Project {
       createdBy: this.createdBy, settings: this.settings, icon: this.icon,
       owner: this.owner, ownerAvatar: this.ownerAvatar, createdByAvatar: this.createdByAvatar,
       isFavorite: this.isFavorite, isAdmin: this.isAdmin, isOwner: this.isOwner, role: this.role,
-      testCases: this.testCases, testPlans: this.testPlans, bugs: this.bugs,
+      testCases: this.testCases, repositories: this.repositories, versions: this.versions,
+      modules: this.modules, testPlans: this.testPlans, bugs: this.bugs,
       knowledgeBaseId: this.knowledgeBaseId, knowledgeBaseName: this.knowledgeBaseName
     }
   }

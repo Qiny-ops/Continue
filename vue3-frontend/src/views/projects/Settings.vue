@@ -585,15 +585,7 @@ const openAddMember = async () => {
     usersLoading.value = true
     try {
       const users = await memberStore.fetchUsers()
-      if (import.meta.env.DEV && (!users || users.length === 0)) {
-        allUsers.value = [
-          { id: 201, name: '赵六', email: 'zhaoliu@example.com' },
-          { id: 202, name: '钱七', email: 'qianqi@example.com' },
-          { id: 203, name: '孙八', email: 'sunba@example.com' }
-        ]
-      } else {
-        allUsers.value = users || []
-      }
+      allUsers.value = users || []
     } finally {
       usersLoading.value = false
     }

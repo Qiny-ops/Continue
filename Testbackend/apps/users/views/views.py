@@ -12,7 +12,8 @@ from rest_framework.decorators import api_view, authentication_classes, permissi
 from rest_framework.permissions import IsAuthenticated
 
 from apps.core.response import StandardResponse
-from apps.core.permissions import is_system_admin
+from apps.core.permissions import is_system_admin, IsInternalServiceOrAuthenticated
+from apps.core.utils.helpers import safe_int
 from apps.core.decorators import (
     require_system_admin,
     require_system_permission,
@@ -86,15 +87,19 @@ def register_view(request):
 
 
 @api_view(['POST'])
+@authentication_classes([JWTAuthentication])
+@permission_classes([IsAuthenticated])
 def logout_view(request):
     """用户登出"""
-    auth_header = request.META.get('HTTP_AUTHORIZATION')
-    if auth_header:
+    auth_header = request.META.get('HTTP_AUTHORIZATION', '')
+    if auth_header and auth_header.startswith('Bearer '):
         try:
-            token = auth_header.split(' ')[1]
-            AuthService.logout(token, request.user)
-        except (IndexError, Exception):
-            pass
+            token = auth_header[7:]  # 切掉 "Bearer "
+            if token:
+                AuthService.logout(token, request.user)
+        except Exception as e:
+            logger.warning(f"登出处理失败: {e}")
+            return StandardResponse(message='登出处理失败', code=500)
 
     return StandardResponse(message='登出成功')
 
@@ -131,10 +136,10 @@ def forgot_password_view(request):
 
 
 @api_view(['POST'])
-def reset_password_view(request, token):
-    """重置密码"""
+def reset_password_view(request, user_id, token):
+    """重置密码 — 使用加密签名 token 验证"""
     try:
-        UserServiceExtended.reset_password(token, request.data.get('new_password'))
+        UserServiceExtended.reset_password(user_id, token, request.data.get('new_password'))
         return StandardResponse(message='密码重置成功')
     except Exception as e:
         return StandardResponse(message=str(e), code=400)
@@ -262,8 +267,8 @@ def get_users_view(request):
 
     安全说明：非管理员用户只能看到基本字段，敏感信息（邮箱、手机、登录时间）被隐藏。
     """
-    page = int(request.GET.get('page', 1))
-    limit = int(request.GET.get('limit', 20))
+    page = safe_int(request.GET.get('page', 1), default=1)
+    limit = safe_int(request.GET.get('limit', 20), default=20)
 
     result = UserService.get_users_list(
         filters={
@@ -312,7 +317,7 @@ def search_users_view(request):
     """搜索用户"""
     users = UserServiceExtended.search_users(
         keyword=request.GET.get('keyword', ''),
-        limit=int(request.GET.get('limit', 20))
+        limit=safe_int(request.GET.get('limit', 20), default=20)
     )
     return StandardResponse(data=users, message='获取成功')
 
@@ -356,6 +361,7 @@ def update_user_status_view(request, user_id):
 @api_view(['GET'])
 @authentication_classes([JWTAuthentication])
 @permission_classes([IsAuthenticated])
+@require_any_system_permission('role_view', 'role_manage', 'user_manage')
 def get_roles_view(request):
     """获取角色列表"""
     from apps.core.permissions import SYSTEM_ROLE_DEFAULTS
@@ -390,14 +396,18 @@ def get_roles_view(request):
 @authentication_classes([JWTAuthentication])
 @permission_classes([IsAuthenticated])
 def get_permissions_view(request):
-    """获取权限列表"""
-    result = PermissionService.get_permissions_and_groups()
-    return StandardResponse(data=result, message='获取成功')
+    """获取权限列表（直接从核心权限模块获取）"""
+    from apps.core.permissions import get_all_permissions, get_permission_groups
+    return StandardResponse(data={
+        'permissions': get_all_permissions(),
+        'groups': get_permission_groups(),
+    }, message='获取成功')
 
 
 @api_view(['POST'])
 @authentication_classes([JWTAuthentication])
 @permission_classes([IsAuthenticated])
+@require_system_admin
 def create_permission_view(request):
     """创建权限"""
     try:
@@ -422,6 +432,7 @@ def create_permission_view(request):
 @api_view(['PUT'])
 @authentication_classes([JWTAuthentication])
 @permission_classes([IsAuthenticated])
+@require_system_admin
 def update_permission_view(request, permission_id):
     """更新权限"""
     try:
@@ -443,8 +454,10 @@ def update_permission_view(request, permission_id):
 
 
 @api_view(['DELETE'])
+@api_view(['DELETE'])
 @authentication_classes([JWTAuthentication])
 @permission_classes([IsAuthenticated])
+@require_system_admin
 def delete_permission_view(request, permission_id):
     """删除权限"""
     try:
@@ -462,6 +475,7 @@ def delete_permission_view(request, permission_id):
 @api_view(['GET'])
 @authentication_classes([JWTAuthentication])
 @permission_classes([IsAuthenticated])
+@require_any_system_permission('user_view', 'user_manage')
 def get_user_view(request, user_id):
     """获取单个用户详情"""
     try:
@@ -584,7 +598,7 @@ def batch_delete_users_view(request):
 
 @api_view(['DELETE'])
 @authentication_classes([JWTAuthentication, InternalServiceAuthentication])
-@permission_classes([])
+@permission_classes([IsInternalServiceOrAuthenticated])
 def cleanup_test_user_view(request):
     """清理测试用户
 
@@ -602,7 +616,7 @@ def cleanup_test_user_view(request):
 
     # 时间戳格式的安全检查：test_YYYYMMDD_HHMMSS_xxxx
     import re
-    if not re.match(r'test_\d{8}_\d{6}_[a-z0-9]{4}$', username):
+    if not re.match(r'test_\d{8}_\d{6}_[a-z0-9]{12}$', username):
         return StandardResponse(message='用户名格式不符合测试账号规范', code=400)
 
     try:

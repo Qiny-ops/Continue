@@ -52,7 +52,9 @@ import {
   List,
   Setting,
   Collection,
-  Monitor
+  Monitor,
+  Document,
+  Cpu
 } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { PROJECT_ROUTE_PREFIX } from '@/router/constants'
@@ -78,14 +80,18 @@ const route = useRoute()
 const NAV_ITEMS = [
   { key: 'overview', label: '项目概览', icon: DataAnalysis },
   { key: 'testcases', label: '测试用例', icon: List },
+  { key: 'requirements', label: '需求管理', icon: Document },
   { key: 'apitest', label: '接口测试', icon: Monitor },
+  { key: 'environments', label: '环境管理', icon: Cpu },
   { key: 'knowledge', label: '知识库', icon: Collection }
 ]
 
 const ROUTE_MAP = {
   overview: '',
   testcases: '/testcases',
+  requirements: '/requirements',
   apitest: '/apitest',
+  environments: '/environments',
   knowledge: '/knowledge',
   settings: '/settings'
 }
@@ -115,6 +121,10 @@ const handleNavClick = (key) => {
   const targetRoute = suffix
     ? `${PROJECT_ROUTE_PREFIX}/${projectId.value}${suffix}`
     : `${PROJECT_ROUTE_PREFIX}/${projectId.value}/`
+
+  // 避免重复跳转到当前路由引起回弹
+  if (route.path === targetRoute || route.path + '/' === targetRoute || route.path === targetRoute + '/') return
+
   router.push(targetRoute)
 }
 </script>

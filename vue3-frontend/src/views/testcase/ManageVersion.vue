@@ -82,9 +82,12 @@ import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus, ArrowLeft, PriceTag } from '@element-plus/icons-vue'
 import { versionApi, repositoryApi } from '@/api/modules/testcase'
+import { useProjectStore } from '@/stores/modules/project'
 
 const route = useRoute()
 const router = useRouter()
+const projectStore = useProjectStore()
+const projectId = computed(() => projectStore.currentProject?.id)
 
 const repoId = computed(() => route.query.repo)
 const repoName = ref('')

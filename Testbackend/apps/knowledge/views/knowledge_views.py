@@ -15,8 +15,20 @@ from rest_framework.response import Response
 from apps.users.authentication import JWTAuthentication
 from apps.core.response import StandardResponse
 from apps.knowledge.services import KnowledgeService
+from apps.knowledge.views.knowledge_base_views import _check_kb_project_permission, _check_kb_permission_by_knowledge
 
 logger = logging.getLogger(__name__)
+
+# 允许上传的文件扩展名白名单
+ALLOWED_FILE_EXTENSIONS = {
+    '.pdf', '.doc', '.docx', '.xls', '.xlsx', '.ppt', '.pptx',
+    '.txt', '.md', '.csv', '.json', '.xml', '.html', '.htm',
+    '.png', '.jpg', '.jpeg', '.gif', '.bmp', '.svg',
+    '.py', '.js', '.java', '.go', '.rs', '.ts', '.tsx', '.jsx',
+    '.yaml', '.yml', '.toml', '.ini', '.cfg',
+}
+# 文件大小上限：50MB
+MAX_FILE_SIZE = 50 * 1024 * 1024
 
 
 @api_view(['GET'])
@@ -31,7 +43,7 @@ def list_knowledge_view(request, kb_id):
     result = KnowledgeService.list_knowledge(kb_id, page, page_size, tag_id)
     if result.get('success'):
         return StandardResponse(data=result.get('data', []), message='获取成功')
-    return StandardResponse(message=result.get('error', '获取失败'), code=500)
+    return StandardResponse(message=result.get('error', '获取失败'), code=result.get('http_status', 500))
 
 
 @api_view(['POST'])
@@ -39,12 +51,28 @@ def list_knowledge_view(request, kb_id):
 @permission_classes([IsAuthenticated])
 def upload_file_knowledge_view(request, kb_id):
     """上传文件知识"""
+    _check_kb_project_permission(request, kb_id)
     file_obj = request.FILES.get('file')
     if not file_obj:
         return StandardResponse(message='文件不能为空', code=400)
 
-    file_content = file_obj.read()
+    # 文件扩展名白名单校验
     file_name = file_obj.name
+    ext = '.' + file_name.rsplit('.', 1)[-1].lower() if '.' in file_name else ''
+    if ext not in ALLOWED_FILE_EXTENSIONS:
+        return StandardResponse(
+            message=f'不支持的文件类型: {ext}，允许的类型: {", ".join(sorted(ALLOWED_FILE_EXTENSIONS))}',
+            code=400
+        )
+
+    # 文件大小校验
+    if file_obj.size > MAX_FILE_SIZE:
+        return StandardResponse(
+            message=f'文件大小超过上限({MAX_FILE_SIZE // 1024 // 1024}MB)',
+            code=400
+        )
+
+    file_content = file_obj.read()
 
     enable_multimodel = request.POST.get('enable_multimodel', 'true').lower() == 'true'
     metadata = request.POST.get('metadata')
@@ -59,7 +87,7 @@ def upload_file_knowledge_view(request, kb_id):
 
     if result.get('success'):
         return StandardResponse(data=result.get('data', {}), message='上传成功')
-    return StandardResponse(message=result.get('error', '上传失败'), code=500)
+    return StandardResponse(message=result.get('error', '上传失败'), code=result.get('http_status', 500))
 
 
 @api_view(['POST'])
@@ -67,13 +95,14 @@ def upload_file_knowledge_view(request, kb_id):
 @permission_classes([IsAuthenticated])
 def create_url_knowledge_view(request, kb_id):
     """从 URL 创建知识"""
+    _check_kb_project_permission(request, kb_id)
     url = request.data.get('url')
     enable_multimodel = request.data.get('enable_multimodel', True)
 
     result = KnowledgeService.create_url_knowledge(kb_id, url, enable_multimodel)
     if result.get('success'):
         return StandardResponse(data=result.get('data', {}), message='创建成功')
-    return StandardResponse(message=result.get('error', '创建失败'), code=500)
+    return StandardResponse(message=result.get('error', '创建失败'), code=result.get('http_status', 500))
 
 
 @api_view(['POST'])
@@ -81,6 +110,7 @@ def create_url_knowledge_view(request, kb_id):
 @permission_classes([IsAuthenticated])
 def create_manual_knowledge_view(request, kb_id):
     """创建手动 Markdown 知识"""
+    _check_kb_project_permission(request, kb_id)
     title = request.data.get('title')
     content = request.data.get('content')
     tag_id = request.data.get('tag_id')
@@ -88,7 +118,7 @@ def create_manual_knowledge_view(request, kb_id):
     result = KnowledgeService.create_manual_knowledge(kb_id, title, content, tag_id)
     if result.get('success'):
         return StandardResponse(data=result.get('data', {}), message='创建成功')
-    return StandardResponse(message=result.get('error', '创建失败'), code=500)
+    return StandardResponse(message=result.get('error', '创建失败'), code=result.get('http_status', 500))
 
 
 @api_view(['GET'])
@@ -99,7 +129,7 @@ def get_knowledge_view(request, knowledge_id):
     result = KnowledgeService.get_knowledge(knowledge_id)
     if result.get('success'):
         return StandardResponse(data=result.get('data', {}), message='获取成功')
-    return StandardResponse(message=result.get('error', '获取失败'), code=500)
+    return StandardResponse(message=result.get('error', '获取失败'), code=result.get('http_status', 500))
 
 
 @api_view(['PUT'])
@@ -107,6 +137,7 @@ def get_knowledge_view(request, knowledge_id):
 @permission_classes([IsAuthenticated])
 def update_knowledge_view(request, knowledge_id):
     """更新知识"""
+    _check_kb_permission_by_knowledge(request, knowledge_id)
     data = request.data
     result = KnowledgeService.update_knowledge(
         knowledge_id,
@@ -116,7 +147,7 @@ def update_knowledge_view(request, knowledge_id):
     )
     if result.get('success'):
         return StandardResponse(data=result.get('data', {}), message='更新成功')
-    return StandardResponse(message=result.get('error', '更新失败'), code=500)
+    return StandardResponse(message=result.get('error', '更新失败'), code=result.get('http_status', 500))
 
 
 @api_view(['PUT'])
@@ -124,6 +155,7 @@ def update_knowledge_view(request, knowledge_id):
 @permission_classes([IsAuthenticated])
 def update_manual_knowledge_view(request, knowledge_id):
     """更新手动 Markdown 知识"""
+    _check_kb_permission_by_knowledge(request, knowledge_id)
     data = request.data
     result = KnowledgeService.update_manual_knowledge(
         knowledge_id,
@@ -132,7 +164,7 @@ def update_manual_knowledge_view(request, knowledge_id):
     )
     if result.get('success'):
         return StandardResponse(data=result.get('data', {}), message='更新成功')
-    return StandardResponse(message=result.get('error', '更新失败'), code=500)
+    return StandardResponse(message=result.get('error', '更新失败'), code=result.get('http_status', 500))
 
 
 @api_view(['DELETE'])
@@ -140,10 +172,11 @@ def update_manual_knowledge_view(request, knowledge_id):
 @permission_classes([IsAuthenticated])
 def delete_knowledge_view(request, knowledge_id):
     """删除知识"""
+    _check_kb_permission_by_knowledge(request, knowledge_id)
     result = KnowledgeService.delete_knowledge(knowledge_id)
     if result.get('success'):
         return StandardResponse(message='删除成功')
-    return StandardResponse(message=result.get('error', '删除失败'), code=500)
+    return StandardResponse(message=result.get('error', '删除失败'), code=result.get('http_status', 500))
 
 
 @api_view(['GET'])
@@ -151,6 +184,7 @@ def delete_knowledge_view(request, knowledge_id):
 @permission_classes([IsAuthenticated])
 def download_knowledge_view(request, knowledge_id):
     """下载知识文件"""
+    _check_kb_permission_by_knowledge(request, knowledge_id)
     from django.http import HttpResponse
 
     response = KnowledgeService.download_knowledge(knowledge_id)
@@ -177,10 +211,11 @@ def download_knowledge_view(request, knowledge_id):
 @permission_classes([IsAuthenticated])
 def reparse_knowledge_view(request, knowledge_id):
     """重新解析知识"""
+    _check_kb_permission_by_knowledge(request, knowledge_id)
     result = KnowledgeService.reparse_knowledge(knowledge_id)
     if result.get('success'):
         return StandardResponse(data=result.get('data', {}), message='重新解析已启动')
-    return StandardResponse(message=result.get('error', '重解析失败'), code=500)
+    return StandardResponse(message=result.get('error', '重解析失败'), code=result.get('http_status', 500))
 
 
 @api_view(['GET'])
@@ -205,7 +240,7 @@ def search_knowledge_view(request):
     )
     if result.get('success'):
         return StandardResponse(data=result.get('data', {}), message='搜索成功')
-    return StandardResponse(message=result.get('error', '搜索失败'), code=500)
+    return StandardResponse(message=result.get('error', '搜索失败'), code=result.get('http_status', 500))
 
 
 @api_view(['POST'])
@@ -222,7 +257,7 @@ def move_knowledge_view(request):
     result = KnowledgeService.move_knowledge(knowledge_ids, source_kb_id, target_kb_id, mode)
     if result.get('success'):
         return StandardResponse(data=result.get('data', {}), message='迁移任务已创建')
-    return StandardResponse(message=result.get('error', '迁移失败'), code=500)
+    return StandardResponse(message=result.get('error', '迁移失败'), code=result.get('http_status', 500))
 
 
 @api_view(['GET'])
@@ -233,7 +268,7 @@ def get_move_progress_view(request, task_id):
     result = KnowledgeService.get_move_progress(task_id)
     if result.get('success'):
         return StandardResponse(data=result.get('data', {}), message='获取成功')
-    return StandardResponse(message=result.get('error', '获取失败'), code=500)
+    return StandardResponse(message=result.get('error', '获取失败'), code=result.get('http_status', 500))
 
 
 @api_view(['GET'])
@@ -316,4 +351,4 @@ def get_knowledge_content_view(request, knowledge_id):
     result = KnowledgeService.get_knowledge_content(knowledge_id)
     if result.get('success'):
         return StandardResponse(data=result.get('data', {}), message='获取成功')
-    return StandardResponse(message=result.get('error', '获取失败'), code=500)
+    return StandardResponse(message=result.get('error', '获取失败'), code=result.get('http_status', 500))

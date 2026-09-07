@@ -305,6 +305,7 @@ import { ElMessage } from 'element-plus'
 import { listKnowledge } from '@/api/modules/knowledge'
 import { getProjectKnowledgeBase } from '@/api/modules/projectKnowledgeBase'
 import { aiApi } from '@/api/modules/testcase'
+import { useMessageQueue } from '@/composables/testcase/useMessageQueue'
 
 const props = defineProps({
   visible: { type: Boolean, default: false },
@@ -355,38 +356,6 @@ const previousResultSummary = computed(() => {
   return `成功 ${r.created_count || 0} 条，失败 ${r.error_count || 0} 条`
 })
 
-const messageQueue = []
-let isProcessingQueue = false
-
-const processMessageQueue = async () => {
-  if (isProcessingQueue) return
-  isProcessingQueue = true
-
-  while (messageQueue.length > 0) {
-    const msg = messageQueue.shift()
-    messages.value.push(msg)
-    await nextTick()
-    scrollToBottom()
-    await new Promise(resolve => setTimeout(resolve, 10))
-  }
-
-  isProcessingQueue = false
-}
-
-const addMessage = (msg) => {
-  messageQueue.push(msg)
-  processMessageQueue()
-}
-
-const updateMessage = (finder, updater) => {
-  const index = messages.value.findIndex(finder)
-  if (index !== -1) {
-    const existing = messages.value[index]
-    const updateValue = typeof updater === 'function' ? updater(existing) : updater
-    messages.value[index] = { ...existing, ...updateValue }
-  }
-}
-
 const canGenerate = computed(() => {
   return projectKnowledgeBase.value &&
     selectedFiles.value.length > 0 &&
@@ -405,6 +374,8 @@ const scrollToBottom = () => {
     }
   })
 }
+
+const { add: addMessage, update: updateMessage } = useMessageQueue(messages, scrollToBottom)
 
 const toggleDetail = (msg) => {
   if (canExpandDetail(msg) && msg.status === 'success') {

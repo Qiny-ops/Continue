@@ -261,6 +261,14 @@
       :thinking-content="thinkingContent"
       :failure-analysis="failureAnalysis"
     />
+
+    <!-- 批量执行对话框 -->
+    <BatchExecuteDialog
+      v-model:visible="batchExecuteDialogVisible"
+      :cases="batchExecuteCases"
+      :environment-id="batchEnvId"
+      @refresh="fetchData"
+    />
   </div>
 </template>
 
@@ -274,6 +282,7 @@ import { useProjectStore } from '@/stores/modules/project'
 import EnvSelector from './components/EnvSelector.vue'
 import ExecuteDialog from './components/ExecuteDialog.vue'
 import AIGenerateDialog from './components/AIGenerateDialog.vue'
+import BatchExecuteDialog from './components/BatchExecuteDialog.vue'
 
 const router = useRouter()
 const projectStore = useProjectStore()
@@ -405,6 +414,10 @@ const clearSelection = () => {
 }
 
 // 批量执行
+const batchExecuteDialogVisible = ref(false)
+const batchExecuteCases = ref([])
+const batchEnvId = ref(null)
+
 const handleBatchExecute = () => {
   if (selectedCases.value.length === 0) {
     ElMessage.warning('请先选择要执行的用例')
@@ -416,8 +429,15 @@ const handleBatchExecute = () => {
     return false
   }
 
-  ElMessage.info(`即将执行 ${selectedCases.value.length} 个用例`)
-  // TODO: 实现批量执行逻辑
+  // 拷贝选中用例快照，避免后续清空选择影响执行
+  // 注意：必须把 testpoint 一并拷过去，否则批量报告与导出中测试点会丢失
+  batchExecuteCases.value = selectedCases.value.map(c => ({
+    id: c.id,
+    name: c.name,
+    testpoint: c.testpoint || null
+  }))
+  batchEnvId.value = envId
+  batchExecuteDialogVisible.value = true
   return true
 }
 
@@ -583,8 +603,8 @@ const handleActionCommand = (command, row) => {
   }
 }
 
-// 直接执行测试用例
-const handleExecuteCase = (row) => {
+// 直接执行测试用例（单用例执行，纳入任务中心记录）
+const handleExecuteCase = async (row) => {
   const envId = selectedEnvironmentId.value || environments.value.find(e => e.is_default)?.id
   if (!envId) {
     ElMessage.warning('请先选择执行环境')
@@ -752,7 +772,7 @@ const handleExecuteCase = (row) => {
         executing.value = false
         fetchData()
       }
-    }
+    },
   )
 }
 
@@ -805,7 +825,7 @@ const handleGenerated = () => {
 // 环境管理
 const handleGoEnvironments = () => {
   const projectCode = projectStore.currentProject?.code || projectId.value
-  router.push(`/p/${projectCode}/apitest/environments`)
+  router.push(`/p/${projectCode}/environments`)
 }
 
 // 打开新建环境对话框

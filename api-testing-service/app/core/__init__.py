@@ -4,6 +4,4 @@
 核心模块
 """
 
-from app.core.engine import ApiTestEngine
-
-__all__ = ["ApiTestEngine"]
+__all__ = []

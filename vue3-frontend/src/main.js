@@ -6,8 +6,7 @@ import zhCn from 'element-plus/dist/locale/zh-cn.mjs'
 import App from './App.vue'
 import router from './router'
 import { useUserStore } from './stores/modules/user'
-import { setupPermissionDirectives } from './directives/permission'
-import { setTokenGetter, setOnAuthError } from './api/axios'
+import { setTokenGetter, setOnAuthError, setOnAuthRedirect } from './api/axios'
 
 // 引入全局样式
 import './styles/variables.css'
@@ -23,8 +22,7 @@ app.use(router)
 
 setTokenGetter(() => useUserStore().token)
 setOnAuthError(() => useUserStore().reset())
-
-setupPermissionDirectives(app)
+setOnAuthRedirect((path) => router.push(path))
 
 app.provide('locale', zhCn)
 

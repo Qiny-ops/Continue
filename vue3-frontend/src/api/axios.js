@@ -3,6 +3,7 @@ import { ERROR_MESSAGES, HTTP_STATUS_MESSAGES } from './errorHandler.js'
 
 let _getToken = null
 let _onAuthError = null
+let _onAuthRedirect = null
 let isRedirecting = false
 
 export function setTokenGetter(getter) {
@@ -11,6 +12,10 @@ export function setTokenGetter(getter) {
 
 export function setOnAuthError(handler) {
   _onAuthError = handler
+}
+
+export function setOnAuthRedirect(handler) {
+  _onAuthRedirect = handler
 }
 
 export function getToken() {
@@ -152,7 +157,12 @@ instance.interceptors.response.use(
                 } else {
                   localStorage.removeItem('user-store')
                 }
-                window.location.href = '/login'
+                // 使用回调跳转（router.push 代替整页刷新 window.location.href）
+                if (_onAuthRedirect) {
+                  _onAuthRedirect('/login')
+                } else {
+                  window.location.href = '/login'
+                }
               }
             }
           }

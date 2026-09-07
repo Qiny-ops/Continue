@@ -18,6 +18,42 @@ from apps.knowledge.services import KnowledgeBaseService
 logger = logging.getLogger(__name__)
 
 
+def _check_kb_project_permission(request, kb_id):
+    """检查用户对知识库关联项目的权限。
+
+    知识库通过 Project.knowledge_base_id 关联到项目。
+    如果知识库关联了项目，验证用户是否为该项目成员或系统管理员。
+    未关联项目（用户自建知识库）则放行。
+    """
+    from apps.projects.models.project import Project
+    from apps.core.permissions import is_system_admin
+    from apps.core.exceptions import PermissionDenied
+
+    if is_system_admin(request.user):
+        return
+
+    project = Project.objects.filter(knowledge_base_id=kb_id).first()
+    if project:
+        from apps.projects.models import ProjectMember
+        is_member = ProjectMember.objects.filter(
+            project=project, user=request.user, status='active'
+        ).exists()
+        if not is_member:
+            raise PermissionDenied('您不是该知识库关联项目的成员')
+
+
+def _check_kb_permission_by_knowledge(request, knowledge_id):
+    """通过知识文档 ID 间接检查项目权限（需额外调用 WeKnora API）。"""
+    from apps.knowledge.repositories.weknora_repository import weknora_repository
+    try:
+        result = weknora_repository.get_knowledge(knowledge_id)
+        kb_id = result.get('data', {}).get('knowledge_base_id', '')
+        if kb_id:
+            _check_kb_project_permission(request, kb_id)
+    except Exception:
+        pass  # WeKnora 不可用时降级放行
+
+
 @api_view(['GET'])
 @authentication_classes([JWTAuthentication])
 @permission_classes([IsAuthenticated])
@@ -26,7 +62,7 @@ def list_knowledge_bases_view(request):
     result = KnowledgeBaseService.list_knowledge_bases()
     if result.get('success'):
         return StandardResponse(data=result.get('data', []), message='获取成功')
-    return StandardResponse(message=result.get('error', '获取失败'), code=500)
+    return StandardResponse(message=result.get('error', '获取失败'), code=result.get('http_status', 500))
 
 
 @api_view(['POST'])
@@ -37,7 +73,7 @@ def create_knowledge_base_view(request):
     result = KnowledgeBaseService.create_knowledge_base(request.data)
     if result.get('success'):
         return StandardResponse(data=result.get('data', {}), message='创建成功')
-    return StandardResponse(message=result.get('error', '创建失败'), code=500)
+    return StandardResponse(message=result.get('error', '创建失败'), code=result.get('http_status', 500))
 
 
 @api_view(['GET'])
@@ -48,7 +84,7 @@ def get_knowledge_base_view(request, kb_id):
     result = KnowledgeBaseService.get_knowledge_base(kb_id)
     if result.get('success'):
         return StandardResponse(data=result.get('data', {}), message='获取成功')
-    return StandardResponse(message=result.get('error', '获取失败'), code=500)
+    return StandardResponse(message=result.get('error', '获取失败'), code=result.get('http_status', 500))
 
 
 @api_view(['PUT'])
@@ -56,10 +92,11 @@ def get_knowledge_base_view(request, kb_id):
 @permission_classes([IsAuthenticated])
 def update_knowledge_base_view(request, kb_id):
     """更新知识库"""
+    _check_kb_project_permission(request, kb_id)
     result = KnowledgeBaseService.update_knowledge_base(kb_id, request.data)
     if result.get('success'):
         return StandardResponse(data=result.get('data', {}), message='更新成功')
-    return StandardResponse(message=result.get('error', '更新失败'), code=500)
+    return StandardResponse(message=result.get('error', '更新失败'), code=result.get('http_status', 500))
 
 
 @api_view(['DELETE'])
@@ -67,10 +104,11 @@ def update_knowledge_base_view(request, kb_id):
 @permission_classes([IsAuthenticated])
 def delete_knowledge_base_view(request, kb_id):
     """删除知识库"""
+    _check_kb_project_permission(request, kb_id)
     result = KnowledgeBaseService.delete_knowledge_base(kb_id)
     if result.get('success'):
         return StandardResponse(message='删除成功')
-    return StandardResponse(message=result.get('error', '删除失败'), code=500)
+    return StandardResponse(message=result.get('error', '删除失败'), code=result.get('http_status', 500))
 
 
 @api_view(['POST'])
@@ -79,11 +117,13 @@ def delete_knowledge_base_view(request, kb_id):
 def copy_knowledge_base_view(request):
     """复制知识库"""
     source_id = request.data.get('source_id')
+    if source_id:
+        _check_kb_project_permission(request, source_id)
     name = request.data.get('name')
     result = KnowledgeBaseService.copy_knowledge_base(source_id, name)
     if result.get('success'):
         return StandardResponse(data=result.get('data', {}), message='复制任务已创建')
-    return StandardResponse(message=result.get('error', '复制失败'), code=500)
+    return StandardResponse(message=result.get('error', '复制失败'), code=result.get('http_status', 500))
 
 
 @api_view(['GET'])
@@ -94,7 +134,7 @@ def get_copy_progress_view(request, task_id):
     result = KnowledgeBaseService.get_copy_progress(task_id)
     if result.get('success'):
         return StandardResponse(data=result.get('data', {}), message='获取成功')
-    return StandardResponse(message=result.get('error', '获取失败'), code=500)
+    return StandardResponse(message=result.get('error', '获取失败'), code=result.get('http_status', 500))
 
 
 @api_view(['PUT'])
@@ -102,10 +142,11 @@ def get_copy_progress_view(request, task_id):
 @permission_classes([IsAuthenticated])
 def pin_knowledge_base_view(request, kb_id):
     """置顶/取消置顶知识库"""
+    _check_kb_project_permission(request, kb_id)
     result = KnowledgeBaseService.pin_knowledge_base(kb_id)
     if result.get('success'):
         return StandardResponse(data=result.get('data', {}), message='操作成功')
-    return StandardResponse(message=result.get('error', '操作失败'), code=500)
+    return StandardResponse(message=result.get('error', '操作失败'), code=result.get('http_status', 500))
 
 
 @api_view(['GET'])
@@ -136,4 +177,4 @@ def hybrid_search_view(request, kb_id):
     result = KnowledgeBaseService.hybrid_search(kb_id, query_text, **kwargs)
     if result.get('success'):
         return StandardResponse(data=result.get('data', []), message='搜索成功')
-    return StandardResponse(message=result.get('error', '搜索失败'), code=500)
+    return StandardResponse(message=result.get('error', '搜索失败'), code=result.get('http_status', 500))

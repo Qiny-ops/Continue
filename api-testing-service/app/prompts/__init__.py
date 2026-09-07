@@ -38,16 +38,11 @@ def get_fill_data_prompt() -> str:
     return load_prompt("fill_test_data.txt")
 
 
-def get_execute_api_prompt() -> str:
-    """获取接口执行提示词"""
-    return load_prompt("execute_api.txt")
-
-
 def get_validate_prompt() -> str:
     """获取结果校验提示词"""
     return load_prompt("validate_testcase.txt")
 
 
-def get_assert_prompt() -> str:
-    """获取AI断言提示词"""
-    return load_prompt("assert_response.txt")
+def get_failure_analysis_prompt() -> str:
+    """获取失败分析提示词"""
+    return load_prompt("failure_analysis.txt")

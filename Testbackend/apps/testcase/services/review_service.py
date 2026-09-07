@@ -13,6 +13,9 @@ logger = logging.getLogger(__name__)
 class ReviewService:
     """评审服务"""
 
+    # 评审轮次上限：超过后不再允许重新提交，防止无限驳回循环
+    MAX_REVISION_COUNT = 5
+
     @staticmethod
     def get_all_reviews():
         """获取所有评审记录"""
@@ -209,6 +212,13 @@ class ReviewService:
 
         # 计算新的评审轮次
         new_revision_number = last_rejected_review.revision_number + 1
+
+        # 评审轮次上限保护：避免争议用例无限驳回循环
+        if new_revision_number > ReviewService.MAX_REVISION_COUNT:
+            raise ValueError(
+                f'评审轮次已达上限 ({ReviewService.MAX_REVISION_COUNT})，'
+                f'无法再次提交。请由管理员确认处置或关闭该用例。'
+            )
 
         # 创建新的评审记录
         new_review = TestCaseReview.objects.create(

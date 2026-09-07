@@ -6,7 +6,7 @@ import logging
 from django.db.models import Count
 from django.db import transaction
 from apps.testcase.repositories import ModuleRepository
-from apps.testcase.models import TestModule, TestCase
+from apps.testcase.models import TestModule, TestCase, TestCaseVersion
 
 logger = logging.getLogger(__name__)
 
@@ -36,9 +36,18 @@ class ModuleService:
 
     @staticmethod
     def build_tree(modules):
-        """构建模块树形结构"""
+        """构建模块树形结构
+
+        为所有模块设置 _children_list（即使为空），
+        避免序列化器回退到 DB 查询（N+1 问题）。
+        """
         module_dict = {m.id: m for m in modules}
         root_modules = []
+
+        # 确保所有模块都有 _children_list
+        for module in modules:
+            if not hasattr(module, '_children_list'):
+                module._children_list = []
 
         for module in modules:
             if module.parent_id is None:
@@ -46,8 +55,6 @@ class ModuleService:
             else:
                 parent = module_dict.get(module.parent_id)
                 if parent:
-                    if not hasattr(parent, '_children_list'):
-                        parent._children_list = []
                     parent._children_list.append(module)
 
         return root_modules
@@ -78,17 +85,31 @@ class ModuleService:
         return module_ids
 
     @staticmethod
-    def get_module_statistics(version_id):
-        """获取模块统计信息"""
+    def get_module_statistics(version_id, stat_type='testcase'):
+        """获取模块统计信息
+
+        Args:
+            version_id: 版本ID
+            stat_type: 统计类型，testcase=用例数，requirement=需求数
+        """
         modules = list(TestModule.objects.filter(
             version_id=version_id
         ).values('id', 'parent_id'))
 
-        case_counts = dict(
-            TestCase.objects.filter(
-                module_id__in=[m['id'] for m in modules]
-            ).values_list('module_id').annotate(count=Count('id'))
-        )
+        if stat_type == 'requirement':
+            from apps.requirement.models import Requirement
+            # 需求不再关联模块，按版本统计总数
+            total_count = Requirement.objects.filter(
+                version_id=version_id
+            ).count()
+            # 为每个模块返回0（需求不再按模块分组）
+            item_counts = {m['id']: 0 for m in modules}
+        else:
+            item_counts = dict(
+                TestCase.objects.filter(
+                    module_id__in=[m['id'] for m in modules]
+                ).values_list('module_id').annotate(count=Count('id'))
+            )
 
         children_map = {}
         for m in modules:
@@ -99,7 +120,7 @@ class ModuleService:
                 children_map[pid].append(m['id'])
 
         def get_total_count(module_id):
-            direct_count = case_counts.get(module_id, 0)
+            direct_count = item_counts.get(module_id, 0)
             children = children_map.get(module_id, [])
             for child_id in children:
                 direct_count += get_total_count(child_id)
@@ -110,7 +131,7 @@ class ModuleService:
             statistics[m['id']] = {
                 'id': m['id'],
                 'count': get_total_count(m['id']),
-                'direct_count': case_counts.get(m['id'], 0)
+                'direct_count': item_counts.get(m['id'], 0)
             }
 
         return statistics
@@ -143,6 +164,11 @@ class ModuleService:
             deleted_cases_count: 删除的用例数量
             error: 错误信息（如果有）
         """
+        # 归档版本冻结：模块与用例已冻结，禁止删除
+        version = TestCaseVersion.objects.filter(id=version_id).first()
+        if version and version.status == 'archived':
+            return 0, 0, '该版本已归档，模块和测试用例已冻结，不可删除'
+
         # 收集所有要删除的模块ID（包括子模块）
         all_ids_to_delete = []
         for module_id in module_ids:

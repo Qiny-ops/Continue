@@ -5,6 +5,5 @@
 """
 
 from app.execute.executor import ApiTestExecutor, ExecutionResult
-from app.execute.engine import TestExecutionEngine
 
-__all__ = ["ApiTestExecutor", "ExecutionResult", "TestExecutionEngine"]
+__all__ = ["ApiTestExecutor", "ExecutionResult"]

@@ -39,14 +39,17 @@
 - 前置条件是否满足（如"已登录用户"是否真的获取到了token或sessionid）
 - 预期结果是否从业务角度达成
 
-### 5. 可跳过的错误
-- 如果注册接口返回"用户已存在"但后续登录成功，不影响整体流程判断
+### 5. 前置条件链断裂识别
+- 执行结果列表中，如果第 N 步失败（返回非2xx），且第 N+1 步依赖第 N 步的成功结果（如注册→登录、登录→操作），则第 N+1 步的失败是连锁反应，**不应判定为独立的服务缺陷**。
+- 在 `reason` 中明确标注"前置条件链断裂，根因在第 N 步"。
 
 ## 输出格式
 
 直接输出 JSON，不要用 markdown 包裹：
 
-{"passed": true或false, "reason": "整体流程校验结论", "flow_checks": [{"item": "校验项", "result": "pass或fail", "detail": "说明"}]}
+{"passed": true, "reason": "整体流程校验结论", "flow_checks": [{"item": "校验项", "result": "pass或fail", "detail": "说明"}]}
+
+注意：passed 必须是 JSON 布尔值 true / false（不要加引号、不要写"true"字符串），整体符合预期为 true，不符合为 false。
 
 ## 要求
 1. 必须根据 expected_status 判断每个接口是否通过，不要仅凭 HTTP 2xx 判断
@@ -54,33 +57,3 @@
 3. 重点关注数据在接口间是否正确传递和使用（包括 Token 和 Cookie）
 4. 直接输出JSON，不要用markdown包裹
 5. reason 要简洁，不超过150字
-
-## 失败分析要求
-
-如果整体校验结果为 passed: false，必须额外输出 failure_analysis 字段：
-
-- root_cause: 失败的根本原因（如参数错误、认证失败、接口依赖断裂等）
-- affected_interfaces: 影响的接口名称列表
-- suggestions: 具体的修改建议数组，每条包含 type 和 description
-  - type 可选值：参数修改、认证问题、接口配置、测试数据、其他
-- debug_steps: 排查步骤数组
-
-示例：
-{
-  "passed": false,
-  "reason": "登录接口返回 401，后续认证接口无法执行",
-  "flow_checks": [{"item": "登录接口", "result": "fail", "detail": "状态码 401"}],
-  "failure_analysis": {
-    "root_cause": "登录接口请求参数错误，密码字段为空导致认证失败",
-    "affected_interfaces": ["用户登录"],
-    "suggestions": [
-      {"type": "参数修改", "description": "确保登录请求的 request_body 包含 username 和 password 字段"},
-      {"type": "测试数据", "description": "检查测试数据中是否配置了正确的用户名和密码"}
-    ],
-    "debug_steps": [
-      "检查登录接口的 request_body 是否包含密码",
-      "确认测试数据中的用户名和密码是否正确",
-      "检查后端是否正确接收了密码参数"
-    ]
-  }
-}

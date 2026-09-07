@@ -54,6 +54,14 @@ SERVICES = {
         "check_file": ".env",
         "url": "http://localhost:8002/docs",
     },
+    "web_automation": {
+        "name": "Web Automation Service",
+        "port": 8003,
+        "path": PROJECT_ROOT / "web-automation-service",
+        "command": ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8003", "--reload"],
+        "check_file": ".env",
+        "url": "http://localhost:8003/docs",
+    },
 }
 
 
@@ -139,6 +147,7 @@ def main() -> None:
     parser.add_argument("--skip-backend", action="store_true", help="跳过后端服务")
     parser.add_argument("--skip-ai-generator", action="store_true", help="跳过 AI Generator 服务")
     parser.add_argument("--skip-api-testing", action="store_true", help="跳过 API Testing 服务")
+    parser.add_argument("--skip-web-automation", action="store_true", help="跳过 Web Automation 服务")
 
     args = parser.parse_args()
 
@@ -154,6 +163,8 @@ def main() -> None:
         services_to_start.append("ai_generator")
     if not args.skip_api_testing:
         services_to_start.append("api_testing")
+    if not args.skip_web_automation:
+        services_to_start.append("web_automation")
 
     # 启动服务
     success_count = 0

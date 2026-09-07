@@ -45,7 +45,7 @@ export function useRepositoryAndVersion() {
     }
   }
 
-  // 获取版本列表
+  // 按用例库获取版本列表
   const fetchVersions = async (repoId) => {
     if (!repoId) return
 
@@ -56,6 +56,32 @@ export function useRepositoryAndVersion() {
       versions.value = response.results || response || []
 
       // 如果有默认版本，自动选中
+      const defaultVersion = versions.value.find(v => v.is_default)
+      if (defaultVersion) {
+        selectedVersion.value = defaultVersion.id
+      } else if (versions.value.length > 0) {
+        selectedVersion.value = versions.value[0].id
+      }
+
+      return versions.value
+    } catch (err) {
+      error.value = err.message
+      throw err
+    } finally {
+      loading.value = false
+    }
+  }
+
+  // 按项目获取版本列表
+  const fetchVersionsByProject = async (projectId) => {
+    if (!projectId) return
+
+    loading.value = true
+    error.value = null
+    try {
+      const response = await versionApi.getVersions({ project: projectId })
+      versions.value = response.results || response || []
+
       const defaultVersion = versions.value.find(v => v.is_default)
       if (defaultVersion) {
         selectedVersion.value = defaultVersion.id
@@ -143,6 +169,7 @@ export function useRepositoryAndVersion() {
     // 方法
     fetchRepositories,
     fetchVersions,
+    fetchVersionsByProject,
     createRepository,
     createVersion,
     setDefaultVersion,
@@ -153,7 +180,7 @@ export function useRepositoryAndVersion() {
 /**
  * 模块树管理
  */
-export function useModuleTree() {
+export function useModuleTree(statType = 'testcase') {
   const modules = ref([])
   const loading = ref(false)
   const error = ref(null)
@@ -172,10 +199,10 @@ export function useModuleTree() {
 
     loading.value = true
     error.value = null
-    
+
     const request = (async () => {
       try {
-        const response = await moduleApi.getModuleTree(versionId)
+        const response = await moduleApi.getModuleTree(versionId, statType)
         const data = response?.data?.data || response?.data || response || []
         modules.value = Array.isArray(data) ? data : []
         return modules.value
@@ -187,7 +214,7 @@ export function useModuleTree() {
         loading.value = false
       }
     })()
-    
+
     pendingRequests.set(versionId, request)
     return request
   }

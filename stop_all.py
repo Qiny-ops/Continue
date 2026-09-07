@@ -104,6 +104,7 @@ def main() -> None:
         8000: "Django Backend",
         8001: "AI Generator Service",
         8002: "API Testing Service",
+        8003: "Web Automation Service",
     }
 
     # 通过端口停止服务

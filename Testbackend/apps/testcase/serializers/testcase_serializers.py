@@ -11,7 +11,8 @@ from apps.testcase.models import (
     TestModule,
     TestCase,
     TestCaseReview,
-    TestCaseExecution
+    TestCaseExecution,
+    AIGenerationRecord
 )
 
 
@@ -57,21 +58,37 @@ class TestCaseDetailSerializer(serializers.ModelSerializer):
     created_by_name = serializers.CharField(source='created_by.username', read_only=True)
     updated_by_name = serializers.CharField(source='updated_by.username', read_only=True)
     module_name = serializers.CharField(source='module.name', read_only=True)
+    requirement_title = serializers.SerializerMethodField(read_only=True)
 
     class Meta:
         model = TestCase
         fields = [
             'id', 'title', 'module', 'module_name', 'version',
             'priority', 'estimated_hours', 'tags', 'automation_status',
-            'automation_case_id', 'requirement', 'precondition', 'review_status',
-            'steps', 'expected_result',
+            'automation_case_id', 'requirement', 'requirement_title', 'precondition', 'review_status',
+            'steps', 'expected_result', 'generation_source',
             'created_by', 'created_by_name', 'updated_by', 'updated_by_name',
             'created_at', 'updated_at'
         ]
 
+    def get_requirement_title(self, obj):
+        """返回关联需求的标题（兼容前端文本展示）"""
+        if obj.requirement_id and hasattr(obj, 'requirement') and obj.requirement:
+            return obj.requirement.title
+        return ''
+
 
 class TestCaseCreateUpdateSerializer(serializers.ModelSerializer):
-    """测试用例创建/更新序列化器"""
+    """测试用例创建/更新序列化器
+
+    requirement 字段兼容两种输入：
+    - 整数 FK ID：标准 Django FK 输入
+    - 字符串：按 Requirement.title 查找（向后兼容旧前端，过渡期后用下拉选择器替代）
+    """
+    requirement = serializers.CharField(
+        required=False, allow_null=True, allow_blank=True,
+        help_text='关联需求 ID 或标题'
+    )
 
     class Meta:
         model = TestCase
@@ -79,8 +96,28 @@ class TestCaseCreateUpdateSerializer(serializers.ModelSerializer):
             'id', 'title', 'module', 'version',
             'priority', 'estimated_hours', 'tags', 'automation_status',
             'automation_case_id', 'requirement', 'precondition', 'review_status',
-            'steps', 'expected_result'
+            'steps', 'expected_result', 'generation_source'
         ]
+
+    def validate_requirement(self, value):
+        """解析 requirement 输入：ID → FK；字符串 → 按标题查找"""
+        if value is None or value == '':
+            return None
+        # 尝试整数 FK ID
+        try:
+            pk = int(value)
+            from apps.requirement.models import Requirement
+            if Requirement.objects.filter(pk=pk).exists():
+                return Requirement.objects.get(pk=pk)
+        except (ValueError, TypeError):
+            pass
+        # 尝试按标题查找
+        from apps.requirement.models import Requirement
+        req = Requirement.objects.filter(title=value).first()
+        if req:
+            return req
+        # 未找到则忽略（不阻塞用例创建）
+        return None
 
 
 class TestModuleSerializer(serializers.ModelSerializer):
@@ -156,12 +193,15 @@ class TestModuleTreeSerializer(serializers.ModelSerializer):
 class TestCaseVersionSerializer(serializers.ModelSerializer):
     """版本序列化器"""
     repository_name = serializers.CharField(source='repository.name', read_only=True)
+    project_id = serializers.IntegerField(source='repository.project_id', read_only=True)
+    project_name = serializers.CharField(source='repository.project.name', read_only=True)
     created_by_name = serializers.CharField(source='created_by.username', read_only=True)
 
     class Meta:
         model = TestCaseVersion
         fields = [
             'id', 'name', 'repository', 'repository_name',
+            'project_id', 'project_name',
             'description', 'status', 'is_default',
             'created_by', 'created_by_name', 'created_at'
         ]
@@ -223,3 +263,21 @@ class TestCaseExecutionSerializer(serializers.ModelSerializer):
             'id', 'test_case', 'test_case_title', 'executed_by', 'executed_by_name',
             'result', 'actual_result', 'remark', 'executed_at'
         ]
+
+
+class AIGenerationRecordSerializer(serializers.ModelSerializer):
+    """AI生成记录序列化器"""
+    created_by_name = serializers.CharField(source='created_by.username', read_only=True, default='')
+
+    class Meta:
+        model = AIGenerationRecord
+        fields = [
+            'id', 'test_case', 'version', 'module',
+            'knowledge_base_ids', 'knowledge_ids',
+            'module_name', 'func_point', 'test_type',
+            'ai_request_id', 'ai_model_version', 'ai_confidence',
+            'ai_raw_result', 'ai_prompt_tokens', 'ai_completion_tokens',
+            'status', 'cases_created_count', 'error_message',
+            'created_by', 'created_by_name', 'created_at', 'updated_at'
+        ]
+        read_only_fields = ['id', 'created_at', 'updated_at']

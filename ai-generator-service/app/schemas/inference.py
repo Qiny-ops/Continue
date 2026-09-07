@@ -4,7 +4,7 @@
 请求/响应数据模型
 """
 
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
@@ -12,7 +12,7 @@ from pydantic import BaseModel, Field
 class Message(BaseModel):
     """消息模型"""
 
-    role: str = Field(..., description="消息角色: user/assistant")
+    role: Literal["user", "assistant"] = Field(..., description="消息角色: user/assistant")
     content: str = Field(..., description="消息内容")
 
 

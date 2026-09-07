@@ -84,8 +84,15 @@ class VersionRepository(BaseRepository):
 
     @classmethod
     def get_by_repository(cls, repository):
-        """获取用例库的所有版本"""
+        """获取用例库下的版本列表"""
         return TestCaseVersion.objects.filter(repository=repository)
+
+    @classmethod
+    def get_by_project(cls, project_id):
+        """获取项目下的版本列表"""
+        return TestCaseVersion.objects.filter(repository__project_id=project_id).select_related(
+            'repository', 'created_by'
+        )
 
     @classmethod
     def get_default_version(cls, repository):
@@ -95,7 +102,14 @@ class VersionRepository(BaseRepository):
         ).first()
 
     @classmethod
-    def create_version(cls, name, repository, created_by, **extra_fields):
+    def get_default_version_by_project(cls, project_id):
+        """获取项目下的默认版本"""
+        return TestCaseVersion.objects.filter(
+            repository__project_id=project_id, is_default=True
+        ).first()
+
+    @classmethod
+    def create_version(cls, name, repository, created_by=None, **extra_fields):
         """创建版本"""
         return TestCaseVersion.objects.create(
             name=name,

@@ -48,23 +48,29 @@ class Validators:
             return False, '用户名只能包含字母、数字和下划线'
         return True, None
 
+    # 常见弱密码黑名单（与 PasswordService 保持同步）
+    _COMMON_PASSWORDS = [
+        'password', 'Password1', 'Password123', 'Admin123', 'Qwer1234',
+        'Abcd1234', 'Test1234', 'Welcome1', 'P@ssw0rd', 'Passw0rd'
+    ]
+
     @classmethod
     def validate_password(cls, password: str) -> Tuple[bool, Optional[str]]:
-        """验证密码强度"""
+        """验证密码强度（与 PasswordService.validate_strength 规则一致）"""
         if not password:
             return False, '密码不能为空'
         if len(password) < cls.PASSWORD_MIN_LENGTH:
             return False, f'密码至少{cls.PASSWORD_MIN_LENGTH}个字符'
         if len(password) > 128:
             return False, '密码最多128个字符'
-
-        # 检查密码复杂度
-        has_letter = any(c.isalpha() for c in password)
-        has_digit = any(c.isdigit() for c in password)
-
-        if not (has_letter and has_digit):
-            return False, '密码必须包含字母和数字'
-
+        if not re.search(r'[A-Z]', password):
+            return False, '密码必须包含至少一个大写字母'
+        if not re.search(r'[a-z]', password):
+            return False, '密码必须包含至少一个小写字母'
+        if not re.search(r'\d', password):
+            return False, '密码必须包含至少一个数字'
+        if password.lower() in [p.lower() for p in cls._COMMON_PASSWORDS]:
+            return False, '密码过于简单，请使用更复杂的密码'
         return True, None
 
     @classmethod

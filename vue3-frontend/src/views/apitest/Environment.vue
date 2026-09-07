@@ -2,10 +2,6 @@
   <div class="manage-page">
     <div class="page-header">
       <div class="header-left">
-        <span class="back-link" @click="router.back()">
-          <el-icon><ArrowLeft /></el-icon>
-          返回
-        </span>
         <span class="title">环境管理</span>
       </div>
       <el-button type="primary" @click="openDialog()">
@@ -29,6 +25,7 @@
         <div class="list-head">
           <span class="col-name">环境名称</span>
           <span class="col-type">类型</span>
+          <span class="col-target">用途</span>
           <span class="col-url">Base URL</span>
           <span class="col-default">默认</span>
           <span class="col-action">操作</span>
@@ -40,6 +37,11 @@
               {{ item.name }}
             </span>
             <span class="col-type">{{ getEnvTypeLabel(item.env_type) }}</span>
+            <span class="col-target">
+              <el-tag :type="item.target_type === 'web' ? 'warning' : 'info'" size="small" effect="light">
+                {{ getTargetTypeLabel(item.target_type) }}
+              </el-tag>
+            </span>
             <span class="col-url">{{ item.base_url || '-' }}</span>
             <span class="col-default">
               <el-tag v-if="item.is_default" type="success" size="small">默认</el-tag>
@@ -67,6 +69,12 @@
             <el-option label="生产环境" value="prod" />
           </el-select>
         </el-form-item>
+        <el-form-item label="用途">
+          <el-select v-model="form.target_type" style="width: 100%">
+            <el-option label="接口测试" value="api" />
+            <el-option label="Web 自动化" value="web" />
+          </el-select>
+        </el-form-item>
         <el-form-item label="Base URL" required>
           <el-input v-model="form.base_url" placeholder="如: http://api.example.com" />
         </el-form-item>
@@ -84,12 +92,11 @@
 
 <script setup>
 import { ref, reactive, onMounted, computed } from 'vue'
-import { useRouter, useRoute } from 'vue-router'
+import { useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Plus, ArrowLeft, Monitor } from '@element-plus/icons-vue'
+import { Plus, Monitor } from '@element-plus/icons-vue'
 import { environmentApi } from '@/api/modules/apitest'
 
-const router = useRouter()
 const route = useRoute()
 const projectId = computed(() => route.params.code || route.params.id)
 
@@ -98,7 +105,7 @@ const submitting = ref(false)
 const list = ref([])
 const dialogVisible = ref(false)
 const editing = ref(null)
-const form = reactive({ name: '', env_type: 'test', base_url: '', description: '' })
+const form = reactive({ name: '', env_type: 'test', target_type: 'api', base_url: '', description: '' })
 
 const ENV_TYPE_LABELS = {
   dev: '开发环境',
@@ -107,7 +114,13 @@ const ENV_TYPE_LABELS = {
   prod: '生产环境'
 }
 
+const TARGET_TYPE_LABELS = {
+  api: '接口测试',
+  web: 'Web 自动化'
+}
+
 const getEnvTypeLabel = (type) => ENV_TYPE_LABELS[type] || type
+const getTargetTypeLabel = (type) => TARGET_TYPE_LABELS[type] || type
 
 const fetchData = async () => {
   if (!projectId.value) return
@@ -126,6 +139,7 @@ const openDialog = (item = null) => {
   editing.value = item
   form.name = item?.name || ''
   form.env_type = item?.env_type || 'test'
+  form.target_type = item?.target_type || 'api'
   form.base_url = item?.base_url || ''
   form.description = item?.description || ''
   dialogVisible.value = true
@@ -160,6 +174,7 @@ const submit = async () => {
     const data = {
       name: form.name.trim(),
       env_type: form.env_type,
+      target_type: form.target_type,
       base_url: form.base_url.trim(),
       description: form.description,
       project: projectId.value
@@ -320,6 +335,10 @@ onMounted(() => fetchData())
 .col-type {
   width: 100px;
   color: #8c8c8c;
+}
+
+.col-target {
+  width: 110px;
 }
 
 .col-url {

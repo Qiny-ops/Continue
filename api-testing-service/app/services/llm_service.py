@@ -5,7 +5,7 @@ LLM 模型调用服务
 """
 
 import json
-from typing import Any, Dict, Generator, List, Optional
+from typing import Any, AsyncGenerator, Dict, List, Optional
 
 import httpx
 
@@ -87,7 +87,7 @@ class LLMService:
         self,
         messages: List[Dict[str, str]],
         **kwargs
-    ) -> Generator[str, None, None]:
+    ) -> AsyncGenerator[str, None]:
         """
         流式调用 LLM
 

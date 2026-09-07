@@ -8,6 +8,7 @@ import jwt
 import os
 from django.conf import settings
 from django.contrib.auth import get_user_model
+from django.contrib.auth.models import AnonymousUser
 from rest_framework import authentication, exceptions
 
 from apps.users.models import TokenBlacklist
@@ -18,7 +19,8 @@ User = get_user_model()
 JWT_SECRET = settings.JWT_SECRET
 
 # 内部服务 API Key（用于微服务之间调用）
-INTERNAL_API_KEY = os.environ.get('INTERNAL_API_KEY', 'internal-service-key-dev')
+# 无默认值：生产环境必须通过环境变量设置；开发环境可在 .env 中配置
+INTERNAL_API_KEY = os.environ.get('INTERNAL_API_KEY', '')
 
 
 class InternalServiceAuthentication(authentication.BaseAuthentication):
@@ -49,9 +51,11 @@ class InternalServiceAuthentication(authentication.BaseAuthentication):
         if api_key != INTERNAL_API_KEY:
             raise exceptions.AuthenticationFailed('内部服务 API Key 无效')
 
-        # 返回 None 作为 user，'internal' 作为认证标识
-        # 表示这是一个内部服务调用，而非用户调用
-        return (None, 'internal')
+        # 返回 AnonymousUser 作为 user，'internal' 作为认证标识
+        # 表示这是一个内部服务调用，而非用户调用。
+        # 注意：DRF 把认证返回的 user 直接赋值给 request.user；若返回 None，
+        # 会让后续依赖 request.user 的代码（如日志/审计中间件）崩溃（AttributeError）。
+        return (AnonymousUser(), 'internal')
 
     def authenticate_header(self, request):
         """

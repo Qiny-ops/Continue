@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>项目修复总览 — software-testing-wiki</title>
+<style>
+:root {
+  --bg:#fff; --text:#2c3e50; --text2:#5a6a7e; --border:#e2e8f0;
+  --crit:#dc3545; --high:#e67e22; --med:#f0ad4e; --low:#3498db; --ok:#27ae60;
+  --crit-bg:#fff5f5; --high-bg:#fff8f1; --med-bg:#fffdf5; --low-bg:#f0f8ff; --ok-bg:#f0faf0;
+  --card-shadow:0 1px 3px rgba(0,0,0,.08); --accent:#667eea;
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+body { font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif; color:var(--text); background:var(--bg); line-height:1.7; }
+.container { max-width:1080px; margin:0 auto; padding:24px; }
+.header { background:linear-gradient(135deg,#0f3460 0%,#16213e 60%,#1a1a2e 100%); color:#fff; padding:48px 24px; text-align:center; border-radius:0 0 16px 16px; }
+.header h1 { font-size:2em; font-weight:800; }
+.header .sub { color:#a8b2d1; margin-top:8px; }
+.header .meta { margin-top:14px; color:#8892b0; font-size:.82em; }
+.cards { display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:14px; margin:28px 0; }
+.card { border:1px solid var(--border); border-radius:10px; padding:18px; box-shadow:var(--card-shadow); text-align:center; }
+.card .n { font-size:2.2em; font-weight:800; }
+.card .l { font-size:.85em; color:var(--text2); margin-top:4px; }
+.card.ok { border-left:4px solid var(--ok); } .card.ok .n { color:var(--ok); }
+.card.crit { border-left:4px solid var(--crit); } .card.crit .n { color:var(--crit); }
+.card.high { border-left:4px solid var(--high); } .card.high .n { color:var(--high); }
+.card.med { border-left:4px solid var(--med); } .card.med .n { color:#b8860b; }
+.card.low { border-left:4px solid var(--low); } .card.low .n { color:var(--low); }
+section { margin:34px 0; }
+h2 { font-size:1.4em; border-bottom:2px solid var(--accent); padding-bottom:8px; margin-bottom:18px; }
+h3 { font-size:1.1em; color:#34495e; margin:20px 0 10px; }
+table { width:100%; border-collapse:collapse; margin:14px 0; }
+th,td { padding:9px 12px; text-align:left; border-bottom:1px solid var(--border); font-size:.88em; }
+th { background:#f8fafc; font-weight:700; }
+tr:hover { background:#f8fafc; }
+.tag { display:inline-block; padding:1px 8px; border-radius:4px; font-size:.72em; font-weight:700; }
+.tag.ok { background:var(--ok); color:#fff; }
+.tag.part { background:var(--med); color:#1a1a2e; }
+.tag.keep { background:var(--low); color:#fff; }
+.tag.wait { background:#95a5a6; color:#fff; }
+.note { font-size:.85em; padding:8px 12px; border-radius:6px; margin:8px 0; }
+.note.ok-bg { background:var(--ok-bg); border-left:3px solid var(--ok); }
+.note.keep-bg { background:var(--low-bg); border-left:3px solid var(--low); }
+.note.wait-bg { background:#f5f5f5; border-left:3px solid #95a5a6; }
+.timeline { border-left:3px solid var(--accent); padding-left:18px; margin:16px 0; }
+.timeline .item { margin:14px 0; }
+.timeline .item .when { font-size:.78em; color:var(--accent); font-weight:700; }
+.verdict { background:linear-gradient(135deg,#f0faf0,#f0f8ff); border:2px solid var(--ok); border-radius:12px; padding:22px; margin:28px 0; text-align:center; }
+.verdict .t { font-size:1.3em; font-weight:800; color:#1a1a2e; }
+.verdict .s { font-size:.92em; color:var(--text2); margin-top:8px; }
+code { background:#f7fafc; padding:1px 5px; border-radius:4px; font-family:'SF Mono',Consolas,monospace; font-size:.85em; }
+ul { margin:8px 0 8px 22px; } li { margin:5px 0; }
+</style>
+</head>
+<body>
+<div class="header">
+  <h1>🛡 项目修复总览</h1>
+  <div class="sub">测试用例管理系统 (software-testing-wiki) — 跨会话整改收口看板</div>
+  <div class="meta">统计截至 2026-08-06 &nbsp;|&nbsp; 覆盖：Django 后端 + api-testing-service + ai-generator-service + 前端</div>
+</div>
+<div class="container">
+
+<!-- 健康度 -->
+<div class="verdict">
+  <div class="t">🏥 项目健康度：C+ → B（已止血 + 关键路径加固）</div>
+  <div class="s">所有 Critical / High / Medium 缺陷已处置；低危项安全快赢已清零；剩余均为需业务决策或高成本重构项。</div>
+</div>
+
+<!-- 修复计数 -->
+<div class="cards">
+  <div class="card crit"><div class="n">5/5</div><div class="l">严重 (P0)</div></div>
+  <div class="card high"><div class="n">8/8</div><div class="l">高危 (P1)</div></div>
+  <div class="card med"><div class="n">17/19</div><div class="l">中危 (P2)</div></div>
+  <div class="card low"><div class="n">7/13</div><div class="l">低危 (P3)</div></div>
+  <div class="card ok"><div class="n">10/10</div><div class="l">业务逻辑审计</div></div>
+  <div class="card ok"><div class="n">20✓</div><div class="l">测试绿灯</div></div>
+</div>
+
+<!-- 本轮新增 -->
+<section>
+<h2>1. 本回合新增（2026-08-06 收尾）</h2>
+<table>
+  <tr><th>项</th><th>动作</th><th>状态</th></tr>
+  <tr><td>P3.8 CI 依赖安全扫描</td><td><code>ci.yml</code> 新增 <code>dependency-audit</code> 任务，对三服务 <code>requirements.txt</code> 跑 <code>pip-audit</code>（软门禁，仅告警）</td><td><span class="tag ok">已闭环</span></td></tr>
+  <tr><td>跨会话全量回归校验</td><td>后端 + 双微服务全部 <code>*.py</code> <code>py_compile</code> 通过</td><td><span class="tag ok">通过</span></td></tr>
+  <tr><td>测试基线复核</td><td><code>pytest</code>（CI 配置 testpaths=apps）：<strong>20 passed, 0 failed</strong></td><td><span class="tag ok">通过</span></td></tr>
+  <tr><td>CORS 加固复检</td><td>确认 <code>api_testcase.py</code> 三处 <code>Access-Control-Allow-Origin</code> 仍走 <code>get_safe_cors_origin()</code>（L271/325/423），#4 编辑未回退安全修复</td><td><span class="tag ok">在位</span></td></tr>
+  <tr><td>P3 快赢复核</td><td>4.7 散落 <code>print()</code>（无匹配）、4.13 重复 <code>csrf_exempt</code> 导入（仅 1 处）——均已在早期清理，无需改动</td><td><span class="tag ok">已完成</span></td></tr>
+</table>
+</section>
+
+<!-- 修复历程 -->
+<section>
+<h2>2. 整改历程与关键成果</h2>
+<div class="timeline">
+  <div class="item"><div class="when">安全止血（阶段0）</div>统一 CORS 白名单（封 14 处反射 Origin）、匿名删号端点加鉴权、三服务 SSRF 防护 + 日志脱敏 + 配置去硬编码。</div>
+  <div class="item"><div class="when">质量基建（阶段1）</div>精确 pinned 依赖（修正 Django <code>&lt;6.0</code> 装不起根因）、补微服务测试（api-testing 44✓ / ai-gen 6✓）、最小 CI（迁移漂移硬门禁）、.env.example 全覆盖。</div>
+  <div class="item"><div class="when">契约统一（阶段2-2）</div>Service 层异常化（~80 处 <code>(data,error)</code>→<code>raise</code>）、视图消除中文子串判码、统一 <code>StandardResponse</code> 错误契约。</div>
+  <div class="item"><div class="when">死代码清理（阶段2）</div>删 4131 行 Django 死备份 + 24 个零引用前端组件（含 3177 行 ProjectInterfaces.vue）+ 废弃 ServiceResult。</div>
+  <div class="item"><div class="when">架构与并发（阶段3）</div>api-testing 上帝类拆分（engine 779→690 行）、ai-gen 并发安全（Semaphore/timeout/异常隔离）、前端 401 router.push、common-py 共享库抽取。</div>
+  <div class="item"><div class="when">深度审查 + P0/P1（08-05）</div>5 个运行时 Bug（NameError 等）修复、2 处 CORS 漏洞修复、.env 真实 Key 替换、硬编码 internal key 移除、知识库/用户接口权限补齐、密码重置改签名 Token、文件上传校验、N+1 优化。</div>
+  <div class="item"><div class="when">P2/P3 中低危（08-06）</div>密码规则统一、TestConnection 桩→真实探测、ast.literal_eval→json、项目创建异常上抛、查询优化、int 防御、重复函数去重、命名约定确认。</div>
+  <div class="item"><div class="when">表重构适配（08-06）</div>TestCase.requirement CharField→FK 兼容（序列化器 + 前端）、历史数据迁移命令、邮箱唯一约束防护、默认用例库唯一性三层防护。</div>
+  <div class="item"><div class="when">业务逻辑审计（08-06）</div>10 项缺陷 9 代码修复 + #10 登记：version 同步、状态机、status 收口、模块删除权限、评审上限、孤儿 FK、需求删除预警、KB 悬空引用、凭据脱敏。</div>
+  <div class="item"><div class="when">凭据存储加密（08-06）</div>#1 彻底闭环：自实现 Fernet 字段加密 auth_token/username/password，迁移重加密历史明文，序列化层回传 <code>****</code> 不再覆盖真值。</div>
+</div>
+</section>
+
+<!-- 当前基线 -->
+<section>
+<h2>3. 当前验证基线</h2>
+<table>
+  <tr><th>检查项</th><th>结果</th></tr>
+  <tr><td>后端 + 双微服务 <code>py_compile</code></td><td><span class="tag ok">全部通过</span></td></tr>
+  <tr><td>Django <code>pytest</code>（apps）</td><td><span class="tag ok">20 passed, 0 failed</span></td></tr>
+  <tr><td><code>makemigrations --check</code></td><td><span class="tag ok">无漂移</span></td></tr>
+  <tr><td>凭据加密 round-trip（临时库）</td><td><span class="tag ok">DB 存密文 / ORM 读明文</span></td></tr>
+  <tr><td>开发库已应用 0003+0004 加密迁移</td><td><span class="tag ok">env1 token 已加密</span></td></tr>
+  <tr><td>微服务测试（历史）</td><td><span class="tag ok">api-testing 44✓ / ai-gen 6✓</span></td></tr>
+</table>
+</section>
+
+<!-- 剩余工作 -->
+<section>
+<h2>4. 剩余工作与决策点</h2>
+
+<h3>4.1 #10 版本关联（已闭环）</h3>
+<div class="note ok-bg">
+  <strong>#10 ApiTestCase / TestCase 版本一致性</strong>：已落实——<code>ApiTestCase.save()</code> 增加与 TestCase #2 一致的版本同步（module 已设时强制 <code>version = module.version</code>），并新增 <code>sync_api_case_versions</code> 回填命令。两者现共享同一版本/模块体系，跨类型统计口径统一。
+</div>
+<div class="note keep-bg">
+  <strong>仍待业务确认（非缺陷）</strong>：审计原建议的"显式 1:1 对应字段"（ApiTestCase↔TestCase）需以真实业务关系为前提，未臆造死字段；若后续确认需要逐条对应关系，再追加可选 FK。
+</div>
+
+<h3>4.2 已判定「合理保留」（非缺陷）</h3>
+<table>
+  <tr><th>项</th><th>结论</th></tr>
+  <tr><td>P2.3.6 宽泛 <code>except Exception</code></td><td><span class="tag keep">合理保留</span> 已由统一 <code>exception_handler</code> 接管，逐个替换成本过高且无实质收益</td></tr>
+  <tr><td>P2.3.15 <code>csrf_exempt</code> 于 SSE 视图</td><td><span class="tag keep">合理保留</span> 流式接口需跨域预检，已由 CORS 白名单 + 鉴权补偿纵深防御</td></tr>
+</table>
+
+<h3>4.3 可选低危重构（P3 残留 6 项）</h3>
+<table>
+  <tr><th>项</th><th>内容</th><th>风险/收益</th></tr>
+  <tr><td>4.1</td><td><code>project_service.py</code> 过长（~1136 行）拆分</td><td>高风险重构，需充分测试</td></tr>
+  <tr><td>4.5</td><td>视图层渐进式类型注解</td><td>低风险，收益有限</td></tr>
+  <tr><td>4.6</td><td>~30 处重复 try/except/StandardResponse → 装饰器</td><td>中风险，系统性改造</td></tr>
+  <tr><td>4.9</td><td><code>get_user_project_ids</code> 多位置实现统一</td><td>中风险，已在阶段3部分解决</td></tr>
+  <tr><td>4.10</td><td>WEKNORA 等配置跨服务不一致</td><td>低风险，配置层治理</td></tr>
+  <tr><td>4.11</td><td>用户序列化器已定义但视图手写 dict</td><td>中风险，需视图层改造</td></tr>
+</table>
+<div class="note keep-bg">以上 6 项均为代码组织/一致性改进，<strong>无安全或功能风险</strong>，建议并入常规迭代渐进完成，不宜集中大改引入回归。</div>
+
+<h3>4.4 其他已登记技术债（非本次范围）</h3>
+<ul>
+  <li>D14 确定性断言引擎恢复（已做温度=0 修复，规则库重建仍待设计）</li>
+  <li>前端 God 组件进一步拆分（ProjectTestCases/AIGenerateDialog 已减 13%/2%，可继续）</li>
+  <li>SQLite → PostgreSQL 生产迁移评估（架构风险 5.2）</li>
+  <li>微服务内存任务存储持久化（架构风险 5.4）</li>
+</ul>
+</section>
+
+<!-- 结论 -->
+<section>
+<h2>5. 结论</h2>
+<p style="line-height:2;">
+  本次长线整改已将项目从 <strong>C+（需立即干预）</strong> 提升至 <strong>B（已止血 + 关键路径加固）</strong>：
+  所有 <strong>Critical/High/Medium</strong> 缺陷均处置完毕，<strong>业务逻辑审计 10/10</strong> 闭环，
+  <strong>环境凭证明文</strong>这一 Critical 短板通过「序列化层脱敏 + 存储层 Fernet 加密」双层彻底解决，
+  凭据泄露、CORS 绕过、权限缺失、运行时崩溃等高风险面已封堵。
+</p>
+<p style="line-height:2; color:var(--text2);">
+  剩余仅为：<strong>6 项可选低危重构</strong>（P3.1/4.5/4.6/4.9/4.10/4.11）与 <strong>1 项非缺陷业务确认</strong>（#10 的 1:1 对应字段，需确认真实业务关系后再决定是否追加可选 FK）。
+  测试基线稳定（pytest 20✓、py_compile 全绿、迁移无漂移），可安全进入下一阶段功能开发或上述低危重构。
+</p>
+</div>
+</body>
+</html>

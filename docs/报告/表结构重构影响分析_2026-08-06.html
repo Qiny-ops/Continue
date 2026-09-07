@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>表结构重构影响分析 — software-testing-wiki</title>
+<style>
+:root {
+  --bg: #fff; --text: #2c3e50; --text-secondary: #5a6a7e;
+  --border: #e2e8f0; --critical: #dc3545; --critical-bg: #fff5f5;
+  --high: #e67e22; --high-bg: #fff8f1; --medium: #f0ad4e; --medium-bg: #fffdf5;
+  --low: #3498db; --low-bg: #f0f8ff; --ok: #27ae60; --ok-bg: #f0faf0;
+  --card-shadow: 0 1px 3px rgba(0,0,0,.08); --code-bg: #f7fafc; --accent: #667eea;
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; color:var(--text); background:var(--bg); line-height:1.7; }
+.container { max-width: 1100px; margin:0 auto; padding: 20px; }
+.header { background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%); color: #fff; padding: 60px 20px; text-align: center; }
+.header h1 { font-size: 2.2em; font-weight: 800; margin-bottom: 8px; }
+.header .subtitle { color: #a8b2d1; font-size: 1.1em; }
+.header .meta { margin-top: 16px; color: #8892b0; font-size: .85em; }
+.section { margin: 40px 0; }
+.section h2 { font-size: 1.5em; color: #1a1a2e; border-bottom: 2px solid var(--accent); padding-bottom: 8px; margin-bottom: 20px; }
+.section h3 { font-size: 1.15em; color: #34495e; margin: 24px 0 12px; }
+.issue { border: 1px solid var(--border); border-radius: 8px; padding: 16px 20px; margin: 12px 0; box-shadow: var(--card-shadow); }
+.issue .severity { display: inline-block; padding: 2px 10px; border-radius: 4px; font-size: .75em; font-weight: 700; margin-right: 10px; }
+.issue .severity.crit { background: var(--critical); color: #fff; }
+.issue .severity.high { background: var(--high); color: #fff; }
+.issue .severity.med { background: var(--medium); color: #1a1a2e; }
+.issue .severity.ok { background: var(--ok); color: #fff; }
+.issue .title { font-size: 1.05em; font-weight: 700; margin: 8px 0; }
+.issue .location { font-size: .82em; color: var(--text-secondary); margin-bottom: 6px; font-family: monospace; }
+.issue .desc { font-size: .92em; margin: 6px 0; }
+.issue .impact { font-size: .85em; padding: 6px 10px; border-radius: 4px; margin: 8px 0; }
+.issue .impact.crit-bg { background: var(--critical-bg); border-left: 3px solid var(--critical); }
+.issue .impact.high-bg { background: var(--high-bg); border-left: 3px solid var(--high); }
+.issue .impact.ok-bg { background: var(--ok-bg); border-left: 3px solid var(--ok); }
+.code-block { background: var(--code-bg); border: 1px solid var(--border); border-radius: 6px; padding: 12px 16px; margin: 10px 0; overflow-x: auto; font-family: monospace; font-size: .85em; line-height: 1.5; }
+table { width: 100%; border-collapse: collapse; margin: 16px 0; }
+th, td { padding: 10px 14px; text-align: left; border-bottom: 1px solid var(--border); font-size: .9em; }
+th { background: #f8fafc; font-weight: 700; }
+tr:hover { background: #f8fafc; }
+.fix { background: var(--ok-bg); border-left: 3px solid var(--ok); padding: 10px 14px; border-radius: 4px; margin: 8px 0; font-size: .9em; }
+.verdict { background: linear-gradient(135deg, #fff5f5 0%, #fff8f1 50%, #f0f8ff 100%); border: 2px solid var(--accent); border-radius: 12px; padding: 24px; margin: 30px 0; text-align: center; }
+.summary-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin: 24px 0; }
+.summary-card { border-radius: 10px; padding: 16px; box-shadow: var(--card-shadow); border: 1px solid var(--border); text-align: center; }
+.summary-card .count { font-size: 2em; font-weight: 800; }
+.summary-card .label { font-size: .85em; color: var(--text-secondary); margin-top: 4px; }
+.summary-card.critical { border-left: 4px solid var(--critical); }
+.summary-card.critical .count { color: var(--critical); }
+.summary-card.high { border-left: 4px solid var(--high); }
+.summary-card.high .count { color: var(--high); }
+.summary-card.ok { border-left: 4px solid var(--ok); }
+.summary-card.ok .count { color: var(--ok); }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>表结构重构影响分析</h1>
+  <div class="subtitle">Migration Squash + 模型重构 — 全量变更审核</div>
+  <div class="meta">分析日期: 2026-08-06 &nbsp;|&nbsp; 变更: 12个模型 / 11张表 / 4个新增应用</div>
+</div>
+
+<div class="container">
+
+<div class="summary-cards">
+  <div class="summary-card critical"><div class="count">2</div><div class="label">功能阻断 (Breaking)</div></div>
+  <div class="summary-card high"><div class="count">3</div><div class="label">数据风险 (Data Risk)</div></div>
+  <div class="summary-card ok"><div class="count">8</div><div class="label">已验证兼容 (Verified)</div></div>
+</div>
+
+<div class="verdict">
+  <strong>总体结论：大部分变更兼容，但有 2 个功能阻断问题需要立即修复。</strong><br>
+  迁移 squash 本身 clean；新 Requirement 模型 + AIGenerationRecord 解耦是正向重构。<br>
+  但 TestCase.requirement 从文本字段改为外键，导致前端数据契约断裂。
+</div>
+
+<!-- ==================== 变更清单 ==================== -->
+<div class="section">
+<h2>1. 变更清单</h2>
+<table>
+  <tr><th>变更</th><th>详情</th><th>风险评估</th></tr>
+  <tr>
+    <td>ApiInfo 模型删除</td>
+    <td>整个模型 + db 表删除（apitest_info）</td>
+    <td class="ok-bg" style="padding:4px">✅ 零引用，无影响</td>
+  </tr>
+  <tr>
+    <td>ApiTestCase 重构</td>
+    <td>删除 steps/assertions/variables/description；precondition JSONField→TextField；新增 testpoint/expectation/test_data/run_list/version/module</td>
+    <td class="ok-bg" style="padding:4px">✅ 序列化器/视图已同步更新</td>
+  </tr>
+  <tr style="background:#fff5f5">
+    <td><strong>TestCase.requirement 类型变更</strong></td>
+    <td>CharField(500) → ForeignKey(Requirement)</td>
+    <td class="crit-bg" style="padding:4px">🔴 前端断裂</td>
+  </tr>
+  <tr>
+    <td>AIGenerationRecord 新建</td>
+    <td>AI 生成元数据从 TestCase 解耦到独立表</td>
+    <td class="ok-bg" style="padding:4px">✅ 序列化器已引用</td>
+  </tr>
+  <tr>
+    <td>Requirement 应用新建</td>
+    <td>需求管理独立应用 + 关联 TestCaseVersion</td>
+    <td class="ok-bg" style="padding:4px">✅ INSTALLED_APPS 已注册</td>
+  </tr>
+  <tr>
+    <td>ProjectRole name/color</td>
+    <td>新增自定义角色显示名和颜色字段</td>
+    <td class="ok-bg" style="padding:4px">✅ 无代码引用冲突</td>
+  </tr>
+  <tr>
+    <td>Project 计数字段删除</td>
+    <td>删除 test_cases/test_plans/bugs 冗余字段</td>
+    <td class="ok-bg" style="padding:4px">✅ 已改用 COUNT 聚合</td>
+  </tr>
+  <tr>
+    <td>TestCaseRepository FK 约束</td>
+    <td>project null=True→必填</td>
+    <td class="ok-bg" style="padding:4px">✅ 上层代码已保证非空</td>
+  </tr>
+  <tr style="background:#fff8f1">
+    <td><strong>User.email unique</strong></td>
+    <td>email 添加唯一约束</td>
+    <td class="high-bg" style="padding:4px">🟠 重复邮箱数据会导致迁移失败</td>
+  </tr>
+  <tr style="background:#fff8f1">
+    <td><strong>缺失数据迁移</strong></td>
+    <td>TestCase.requirement 文本值 → FK 无转换脚本</td>
+    <td class="high-bg" style="padding:4px">🟠 历史需求数据全部丢失</td>
+  </tr>
+  <tr>
+    <td>admin.py search_fields</td>
+    <td>requirement FK 字段搜索报错</td>
+    <td class="ok-bg" style="padding:4px">✅ 已修复 → requirement__title</td>
+  </tr>
+  <tr>
+    <td>seed_test_data.py</td>
+    <td>management command 使用字符串作 FK</td>
+    <td class="high-bg" style="padding:4px">🟠 开发工具不可用</td>
+  </tr>
+  <tr>
+    <td>迁移 squash</td>
+    <td>5个增量迁移合并到初始迁移</td>
+    <td class="ok-bg" style="padding:4px">✅ makemigrations --check clean</td>
+  </tr>
+</table>
+</div>
+
+<!-- ==================== 问题详情 ==================== -->
+<div class="section">
+<h2>2. 功能阻断问题 (Breaking)</h2>
+
+<div class="issue">
+  <span class="severity crit">Breaking</span>
+  <div class="title">2.1 前端 requirement 数据契约断裂</div>
+  <div class="location">TestCase.requirement: CharField → ForeignKey</div>
+  <div class="desc">
+    <strong>根因</strong>：TestCase.requirement 从 CharField(max_length=500) 改为 ForeignKey(Requirement, null=True)。<br>
+    DRF ModelSerializer 自动生成 <code>PrimaryKeyRelatedField</code>，只接受整数 ID，不再接受文本字符串。<br>
+    <strong>前端受影响位置</strong>（5 处）：
+  </div>
+  <div class="code-block">
+<span style="color:#6a737d"># 1. TestCaseDialog.vue:211 — 创建/编辑测试用例</span>
+&lt;el-input v-model="localForm.requirement" placeholder="请输入关联需求" /&gt;
+<span style="color:#6a737d">   → 用户输入文本 "REQ-LOGIN-001" → 后端期望整数 ID → 400 错误</span>
+
+<span style="color:#6a737d"># 2. ProjectTestCases.vue:344 — 评审编辑</span>
+&lt;el-input v-model="reviewEditForm.requirement" placeholder="请输入关联需求" /&gt;
+<span style="color:#6a737d">   → 同问题，评审编辑提交时 requirement 为文本 → 400</span>
+
+<span style="color:#6a737d"># 3. ProjectTestCases.vue:547/629 — 数据初始化和提交</span>
+requirement: caseDetail.requirement || ''   <span style="color:#6a737d"># 从详情读取 FK ID</span>
+requirement: form.requirement              <span style="color:#6a737d"># 提交时传文本 → 400</span>
+
+<span style="color:#6a737d"># 4. export.js:26/70 — CSV 导出</span>
+'关联需求': tc.requirement || ''   <span style="color:#6a737d"># 现在显示整数 ID 而非 "REQ-LOGIN-001"</span>
+
+<span style="color:#6a737d"># 5. useTestCaseReview.js:114/143 — 评审组合式函数</span>
+reviewEditForm.requirement = c.requirement || ''  <span style="color:#6a737d"># 整数 ID → 显示为数字</span>
+  </div>
+  <div class="impact crit-bg">
+    <strong>影响</strong>：所有测试用例的"关联需求"字段在创建/编辑/导出/评审中均不可用。<br>
+    用户无法通过前端输入新的关联需求；查看已有数据时显示数字 ID 而非可读文本。
+  </div>
+</div>
+
+<div class="issue">
+  <span class="severity crit">Breaking</span>
+  <div class="title">2.2 TestCase 序列化器输出契约变更</div>
+  <div class="location">TestCaseDetailSerializer / TestCaseListSerializer</div>
+  <div class="desc">
+    序列化器字段列表包含 <code>'requirement'</code>。ModelSerializer 对 FK 默认返回主键值（整数）。<br>
+    前端代码（TestCaseDialog.vue、ProjectTestCases.vue、export.js）期望 requirement 为字符串。
+  </div>
+  <div class="impact crit-bg">
+    <strong>影响</strong>：GET 请求返回的 requirement 从 "REQ-LOGIN-001" 变为 1/2/3...（FK ID）。<br>
+    前端列表页面、详情弹窗、CSV 导出全部显示错误数据。
+  </div>
+</div>
+
+</div>
+
+<!-- ==================== 数据风险 ==================== -->
+<div class="section">
+<h2>3. 数据风险</h2>
+
+<div class="issue">
+  <span class="severity high">Data Risk</span>
+  <div class="title">3.1 历史需求数据全部丢失</div>
+  <div class="location">TestCase.requirement 迁移无数据转换脚本</div>
+  <div class="desc">
+    Django CharField→ForeignKey 迁移时，Django 会<strong>先删除旧列再创建新列</strong>。<br>
+    旧 requirement 列的文本值（如 "REQ-LOGIN-001"）在迁移执行时直接丢弃，新 requirement_id 列全部为 NULL。<br>
+    所有历史测试用例的关联需求信息永久丢失。
+  </div>
+  <div class="impact high-bg">
+    <strong>影响</strong>：生产数据库中所有现有测试用例的 requirement 字段变为 NULL。<br>
+    需要数据迁移脚本：创建对应的 Requirement 记录，然后建立 FK 关联。
+  </div>
+</div>
+
+<div class="issue">
+  <span class="severity high">Data Risk</span>
+  <div class="title">3.2 User.email unique 约束可能导致迁移失败</div>
+  <div class="location">users/migrations/0001_initial.py（squashed 后）</div>
+  <div class="desc">
+    新增 <code>unique=True</code> 约束。如果数据库中已有重复邮箱的用户记录，<code>migrate</code> 会失败。<br>
+    需要先运行数据清洗脚本去除重复邮箱。
+  </div>
+  <div class="impact high-bg">
+    <strong>影响</strong>：有重复邮箱的数据库无法完成迁移，部署阻塞。
+  </div>
+</div>
+
+<div class="issue">
+  <span class="severity high">Dev Tool</span>
+  <div class="title">3.3 seed_test_data.py 不可用</div>
+  <div class="location">management/commands/seed_test_data.py</div>
+  <div class="desc">
+    所有 seed 数据（12 条用例）使用 <code>'requirement': 'REQ-LOGIN-001'</code> 文本字符串。<br>
+    ORM 的 TestCase.objects.create(**data) 中 requirement 期望 FK 对象，传入字符串抛出 ValueError。
+  </div>
+  <div class="impact high-bg">
+    <strong>影响</strong>：开发环境初始化命令失效。需先创建 Requirement 对象再关联。
+  </div>
+</div>
+
+</div>
+
+<!-- ==================== 已验证兼容 ==================== -->
+<div class="section">
+<h2>4. 已验证兼容的变更</h2>
+
+<div class="issue">
+  <span class="severity ok">Verified</span>
+  <div class="title">ApiInfo 删除 — 零影响</div>
+  <div class="desc">全仓搜索确认无 import 或 objects 引用。</div>
+</div>
+<div class="issue">
+  <span class="severity ok">Verified</span>
+  <div class="title">ApiTestCase 重构 — 序列化器已对齐</div>
+  <div class="desc">ApiTestCaseSerializer/ApiTestCaseListSerializer 使用新字段（testpoint/expectation/test_data/run_list/version/module）。无旧字段引用。</div>
+</div>
+<div class="issue">
+  <span class="severity ok">Verified</span>
+  <div class="title">AIGenerationRecord — 解耦完成</div>
+  <div class="desc">TestCase 的 ai_* 字段已移除；AIGenerationRecord 在序列化器中正确引用。</div>
+</div>
+<div class="issue">
+  <span class="severity ok">Verified</span>
+  <div class="title">Project 计数字段删除 — 无引用</div>
+  <div class="desc">test_cases/test_plans/bugs 3 字段全仓无引用。已改用 ORM COUNT 聚合实时计算。</div>
+</div>
+<div class="issue">
+  <span class="severity ok">Verified</span>
+  <div class="title">TestCaseRepository FK 收紧 — 安全</div>
+  <div class="desc">上层代码（services）始终传入 project=project，不存在 NULL 场景。</div>
+</div>
+<div class="issue">
+  <span class="severity ok">Verified</span>
+  <div class="title">ProjectRole name/color — 不冲突</div>
+  <div class="desc">新增字段，无已有代码修改。角色 CRUD 视图能正常序列化。</div>
+</div>
+<div class="issue">
+  <span class="severity ok">Verified</span>
+  <div class="title">迁移 Squash — Clean</div>
+  <div class="desc">makemigrations --check --dry-run: No changes detected | Django 20 tests: OK</div>
+</div>
+<div class="issue">
+  <span class="severity ok">Verified</span>
+  <div class="title">Requirement 新应用 — 已注册</div>
+  <div class="desc">INSTALLED_APPS 包含 apps.requirement；testcase 迁移依赖 requirement.0002_initial。</div>
+</div>
+</div>
+
+<!-- ==================== 修复建议 ==================== -->
+<div class="section">
+<h2>5. 修复建议</h2>
+
+<h3>P0 — 立即修复（功能阻断）</h3>
+
+<div class="fix">
+<strong>修复 1：TestCaseCreateUpdateSerializer requirement 字段兼容化</strong><br>
+将自动生成的 PrimaryKeyRelatedField 改为自定义字段，支持：
+<ul>
+  <li>接受整数 FK ID（正常关联）</li>
+  <li>接受字符串 → 查找 Requirement.objects.filter(title=value).first() → 取 ID（向后兼容旧前端）</li>
+  <li>序列化输出时返回 Requirement.title 而非 ID（前端显示友好）</li>
+</ul>
+</div>
+
+<div class="fix">
+<strong>修复 2：TestCaseDetailSerializer / TestCaseListSerializer requirement 输出改造</strong><br>
+将 requirement 从默认 FK 字段改为 SerializerMethodField，返回 <code>{'id': obj.requirement_id, 'title': obj.requirement.title if obj.requirement else ''}</code>。<br>
+前端可继续用 <code>tc.requirement || ''</code> 读取。
+</div>
+
+<div class="fix">
+<strong>修复 3：admin.py search_fields</strong><br>
+已修复：<code>'requirement'</code> → <code>'requirement__title'</code> ✅
+</div>
+
+<h3>P1 — 数据恢复（数据风险）</h3>
+
+<div class="fix">
+<strong>修复 4：数据迁移脚本</strong><br>
+创建 RunPython 迁移：遍历旧 requirement 文本值 → 提取需求编号（如 REQ-LOGIN-001） → 创建 Requirement 记录 → 建立 FK 关联。<br>
+仅适用于从旧数据库迁移场景；新部署跳过。
+</div>
+
+<div class="fix">
+<strong>修复 5：seed_test_data.py 更新</strong><br>
+先创建 Requirement 对象列表，再用 FK 关联到 TestCase。
+</div>
+
+</div>
+
+</div>
+</body>
+</html>

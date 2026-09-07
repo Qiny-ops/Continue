@@ -6,17 +6,10 @@ API 路由定义
 RESTful API 接口
 """
 
-import json
-from typing import Any, Dict, List, Optional
-from fastapi import APIRouter, HTTPException
-from fastapi.responses import StreamingResponse
+from typing import Optional
+from fastapi import APIRouter, HTTPException, Request
 
 from app.config import get_settings
-from app.core.engine import ApiTestEngine
-from app.execute.engine import TestExecutionEngine
-from app.services.kb_client import KBClient
-from app.services.llm_service import LLMService
-from app.services.db_service import DBService
 from app.schemas.rpc import (
     GetFlowParams,
     GenerateTestCaseParams,
@@ -28,47 +21,16 @@ from app.schemas.rpc import (
     HealthResponse,
 )
 from app.utils.logger import get_logger
+from app.utils.sse import sse_response
 
 logger = get_logger(__name__)
 
 router = APIRouter(tags=["api"])
 
-# 全局服务实例
-_kb_client: Optional[KBClient] = None
-_llm_service: Optional[LLMService] = None
-_db_service: Optional[DBService] = None
-_engine: Optional[ApiTestEngine] = None
 
-
-def init_services():
-    """初始化服务"""
-    global _kb_client, _llm_service, _db_service, _engine
-
-    if _engine is None:
-        _llm_service = LLMService()
-        _kb_client = KBClient()
-        _db_service = DBService()
-
-        _engine = ApiTestEngine(
-            kb_client=_kb_client,
-            llm_service=_llm_service,
-            db_service=_db_service
-        )
-
-        logger.info("服务初始化完成")
-
-    return _engine
-
-
-def get_execution_engine() -> TestExecutionEngine:
-    """获取执行引擎"""
-    global _kb_client, _llm_service
-
-    if _kb_client is None or _llm_service is None:
-        _llm_service = LLMService()
-        _kb_client = KBClient()
-
-    return TestExecutionEngine(kb_client=_kb_client, llm_service=_llm_service)
+def _get_engine(request: Request):
+    """从 app.state 获取引擎实例"""
+    return request.app.state.engine
 
 
 # ==================== 健康检查 ====================
@@ -108,191 +70,121 @@ async def status():
 # ==================== 接口业务流 ====================
 
 @router.post("/flow")
-async def get_flow(params: GetFlowParams):
-    """
-    获取接口业务流（流式）
-    """
-    init_services()
-
-    async def generate():
-        async for event in _engine.get_flow(
-            kb_id=params.kb_id,
-            query=params.query,
-            kb_api_key=params.kb_api_key
-        ):
-            yield f"data: {json.dumps(event, ensure_ascii=False)}\n\n"
-
-    return StreamingResponse(
-        generate(),
-        media_type="text/event-stream",
-        headers={"Cache-Control": "no-cache", "Connection": "keep-alive"}
-    )
+async def get_flow(params: GetFlowParams, request: Request):
+    """获取接口业务流（流式）"""
+    engine = _get_engine(request)
+    return sse_response(engine.get_flow(
+        kb_id=params.kb_id,
+        query=params.query,
+        kb_api_key=params.kb_api_key
+    ))
 
 
 # ==================== 测试用例生成 ====================
 
 @router.post("/testcase/generate")
-async def generate_testcase(params: GenerateTestCaseParams):
-    """
-    生成接口测试用例（流式）
-    """
-    init_services()
-
-    async def generate():
-        async for event in _engine.generate_testcase(
-            kb_id=params.kb_id,
-            query=params.query,
-            kb_api_key=params.kb_api_key,
-            save_to_db=params.save_to_db,
-            knowledge_id=params.knowledge_id
-        ):
-            yield f"data: {json.dumps(event, ensure_ascii=False)}\n\n"
-
-    return StreamingResponse(
-        generate(),
-        media_type="text/event-stream",
-        headers={"Cache-Control": "no-cache", "Connection": "keep-alive"}
-    )
+async def generate_testcase(params: GenerateTestCaseParams, request: Request):
+    """生成接口测试用例（流式）"""
+    engine = _get_engine(request)
+    return sse_response(engine.generate_testcase(
+        kb_id=params.kb_id,
+        query=params.query,
+        kb_api_key=params.kb_api_key,
+        save_to_db=params.save_to_db,
+        knowledge_id=params.knowledge_id
+    ))
 
 
 # ==================== 接口依赖分析 ====================
 
 @router.post("/dependency")
-async def get_dependency(params: GetDependencyParams):
-    """
-    获取接口依赖（流式）
-    """
-    init_services()
-
-    async def generate():
-        async for event in _engine.get_api_dependency(
-            case_id=params.case_id,
-            api_name=params.api_name,
-            precondition=params.precondition,
-            testpoint=params.testpoint,
-            expectation=params.expectation,
-            kb_id=params.kb_id,
-            kb_api_key=params.kb_api_key
-        ):
-            yield f"data: {json.dumps(event, ensure_ascii=False)}\n\n"
-
-    return StreamingResponse(
-        generate(),
-        media_type="text/event-stream",
-        headers={"Cache-Control": "no-cache", "Connection": "keep-alive"}
-    )
+async def get_dependency(params: GetDependencyParams, request: Request):
+    """获取接口依赖（流式）"""
+    engine = _get_engine(request)
+    return sse_response(engine.get_api_dependency(
+        case_id=params.case_id,
+        api_name=params.api_name,
+        precondition=params.precondition,
+        testpoint=params.testpoint,
+        expectation=params.expectation,
+        kb_id=params.kb_id,
+        kb_api_key=params.kb_api_key
+    ))
 
 
 # ==================== 测试数据填充 ====================
 
 @router.post("/testdata/fill")
-async def fill_testdata(params: FillDataParams):
-    """
-    填充测试数据（流式）
-    """
-    init_services()
+async def fill_testdata(params: FillDataParams, request: Request):
+    """填充测试数据（流式）"""
+    engine = _get_engine(request)
     settings = get_settings()
-
-    # 使用传入的 base_url 或配置的默认值
     base_url = params.base_url or settings.api_base_url
 
-    async def generate():
-        async for event in _engine.fill_test_data(
-            case_id=params.case_id,
-            api_name=params.api_name,
-            precondition=params.precondition,
-            testpoint=params.testpoint,
-            expectation=params.expectation,
-            dependency=params.dependency,
-            test_data=params.test_data,
-            kb_id=params.kb_id,
-            kb_api_key=params.kb_api_key,
-            base_url=base_url
-        ):
-            yield f"data: {json.dumps(event, ensure_ascii=False)}\n\n"
-
-    return StreamingResponse(
-        generate(),
-        media_type="text/event-stream",
-        headers={"Cache-Control": "no-cache", "Connection": "keep-alive"}
-    )
+    return sse_response(engine.fill_test_data(
+        case_id=params.case_id,
+        api_name=params.api_name,
+        precondition=params.precondition,
+        testpoint=params.testpoint,
+        expectation=params.expectation,
+        dependency=params.dependency,
+        test_data=params.test_data,
+        kb_id=params.kb_id,
+        kb_api_key=params.kb_api_key,
+        base_url=base_url
+    ))
 
 
 # ==================== 测试用例执行 ====================
 
 @router.post("/testcase/execute")
-async def execute_testcase(params: ExecuteTestCaseParams):
-    """
-    执行测试用例（流式）
-    """
-    engine = get_execution_engine()
+async def execute_testcase(params: ExecuteTestCaseParams, request: Request):
+    """执行测试用例（流式）"""
+    engine = _get_engine(request)
     settings = get_settings()
-
-    # 使用传入的 base_url 或配置的默认值
     base_url = params.base_url or settings.api_base_url
 
-    async def generate():
-        async for event in engine.execute_testcase(
-            case_id=params.case_id,
-            api_name=params.api_name,
-            precondition=params.precondition,
-            testpoint=params.testpoint,
-            expectation=params.expectation,
-            run_list=params.run_list,
-            test_data=params.test_data,
-            base_url=base_url,
-            kb_id=params.kb_id,
-            kb_api_key=params.kb_api_key
-        ):
-            yield f"data: {json.dumps(event, ensure_ascii=False)}\n\n"
-
-    return StreamingResponse(
-        generate(),
-        media_type="text/event-stream",
-        headers={"Cache-Control": "no-cache", "Connection": "keep-alive"}
-    )
+    return sse_response(engine.execute_testcase(
+        case_id=params.case_id,
+        api_name=params.api_name,
+        precondition=params.precondition,
+        testpoint=params.testpoint,
+        expectation=params.expectation,
+        run_list=params.run_list,
+        test_data=params.test_data,
+        base_url=base_url,
+        kb_id=params.kb_id,
+        kb_api_key=params.kb_api_key
+    ))
 
 
 # ==================== 测试用例校验 ====================
 
 @router.post("/testcase/validate")
-async def validate_testcase(params: ValidateTestCaseParams):
-    """
-    校验测试用例（流式）
-    """
-    engine = get_execution_engine()
-
-    async def generate():
-        async for event in engine.validate_testcase(
-            case_id=params.case_id,
-            api_name=params.api_name,
-            precondition=params.precondition,
-            testpoint=params.testpoint,
-            expectation=params.expectation,
-            execution_results=params.execution_results,
-            kb_id=params.kb_id,
-            kb_api_key=params.kb_api_key
-        ):
-            yield f"data: {json.dumps(event, ensure_ascii=False)}\n\n"
-
-    return StreamingResponse(
-        generate(),
-        media_type="text/event-stream",
-        headers={"Cache-Control": "no-cache", "Connection": "keep-alive"}
-    )
+async def validate_testcase(params: ValidateTestCaseParams, request: Request):
+    """校验测试用例（流式）"""
+    engine = _get_engine(request)
+    return sse_response(engine.validate_testcase(
+        case_id=params.case_id,
+        api_name=params.api_name,
+        precondition=params.precondition,
+        testpoint=params.testpoint,
+        expectation=params.expectation,
+        execution_results=params.execution_results,
+        kb_id=params.kb_id,
+        kb_api_key=params.kb_api_key
+    ))
 
 
 # ==================== LLM 对话 ====================
 
 @router.post("/llm/chat")
-async def llm_chat(params: LLMChatParams):
-    """
-    LLM 对话（同步）
-    """
-    init_services()
+async def llm_chat(params: LLMChatParams, request: Request):
+    """LLM 对话（同步）"""
+    engine = _get_engine(request)
 
     result = None
-    async for event in _engine.llm_chat(
+    async for event in engine.llm_chat(
         query=params.query,
         system_message=params.system_message,
         stream=False
@@ -306,22 +198,11 @@ async def llm_chat(params: LLMChatParams):
 
 
 @router.post("/llm/chat/stream")
-async def llm_chat_stream(params: LLMChatParams):
-    """
-    LLM 对话（流式）
-    """
-    init_services()
-
-    async def generate():
-        async for event in _engine.llm_chat(
-            query=params.query,
-            system_message=params.system_message,
-            stream=True
-        ):
-            yield f"data: {json.dumps(event, ensure_ascii=False)}\n\n"
-
-    return StreamingResponse(
-        generate(),
-        media_type="text/event-stream",
-        headers={"Cache-Control": "no-cache", "Connection": "keep-alive"}
-    )
+async def llm_chat_stream(params: LLMChatParams, request: Request):
+    """LLM 对话（流式）"""
+    engine = _get_engine(request)
+    return sse_response(engine.llm_chat(
+        query=params.query,
+        system_message=params.system_message,
+        stream=True
+    ))

@@ -10,6 +10,7 @@
 要求：
 1、直接返回 JSON 结果，不要包含任何分析、解释或说明文字，不要使用 markdown 代码块标记
 2、严格按照以下格式生成，run_list 必须包含所有依赖接口（含主接口），按执行顺序排列
+3、本步骤只负责编排：确定接口、顺序、参数提取（extract_vars）、预期状态码（expected_status）和必要的 headers。**request_body 留空对象 {} 即可，具体数据值由后续「数据填充」步骤负责**，不要在此填写字段值
 
 例如：
 {
@@ -20,7 +21,7 @@
       "api_name": "用户注册接口",
       "api_url": "/api/users/register/",
       "method": "POST",
-      "request_body": {"username": "test_20260524_143000_a1b2", "password": "Test@123456", "email": "test_20260524_143000@example.com"},
+      "request_body": {},
       "expected_status": 201,
       "extract_vars": {"user_id": "$.run_list[0].response.body.data.id"},
       "description": "注册测试用户"
@@ -30,7 +31,7 @@
       "api_name": "用户登录接口",
       "api_url": "/api/users/login/",
       "method": "POST",
-      "request_body": {"username": "test_20260524_143000_a1b2", "password": "Test@123456"},
+      "request_body": {},
       "expected_status": 200,
       "extract_vars": {"token": "$.run_list[1].response.body.data.token"},
       "description": "登录获取token"
@@ -46,9 +47,9 @@
 
 2、**expected_status**：每个接口必须标注预期状态码。异常场景（如"密码错误"、"未授权"）必须用对应的 4xx 状态码或通配符（如 `"4XX"`）
 
-3、**注册账号**：必须使用时间戳格式 `test_YYYYMMDD_HHMMSS_xxxx`，禁止使用 testuser、admin 等固定账号名，后续登录接口必须使用相同账号名
+3、**注册/登录账号**：账号的用户名、密码等具体值由「数据填充」步骤生成。如果多个注册/登录步骤涉及不同用户，在 api_name 或 description 中标注用户角色（如"注册用户A"、"注册用户B"），数据填充步骤会据此为每个用户生成独立账号并保证注册与登录配对
 
-4、**管理员场景**：如果测试用例涉及管理员操作，必须使用预设管理员账号登录（用户名：{{admin_username}}，密码：{{admin_password}}），禁止注册新管理员。管理员登录使用占位符：`{"username": "{{admin_username}}", "password": "{{admin_password}}"}`
+4、**管理员场景**：如果测试用例涉及管理员操作，必须使用预设管理员账号登录（用户名：__ADMIN_USERNAME__，密码：__ADMIN_PASSWORD__），禁止注册新管理员。管理员登录使用占位符：`{"username": "__ADMIN_USERNAME__", "password": "__ADMIN_PASSWORD__"}`
 
 5、**禁止 JS 表达式**：如 `"a".repeat(200)` 等，必须是纯 JSON 字符串值
 

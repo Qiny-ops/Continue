@@ -22,7 +22,7 @@ class BaseService:
             def register(self, username, email, password):
                 # 业务逻辑：验证、创建用户、发送邮件等
                 if self.repository.exists({'username': username}):
-                    return None, '用户名已存在'
+                    raise BusinessError('用户名已存在')
 
                 user = self.repository.create(
                     username=username,

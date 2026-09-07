@@ -9,7 +9,7 @@
       >
         <div class="nav-item-content">
           <el-icon class="nav-icon"><FolderOpened /></el-icon>
-          <span class="nav-label">全部用例</span>
+          <span class="nav-label">{{ allLabel }}</span>
           <span v-if="totalCount !== undefined" class="nav-count">{{ totalCount }}</span>
         </div>
       </div>
@@ -143,6 +143,10 @@ const props = defineProps({
   currentVersion: {
     type: [Number, String],
     default: null
+  },
+  allLabel: {
+    type: String,
+    default: '全部用例'
   }
 })
 

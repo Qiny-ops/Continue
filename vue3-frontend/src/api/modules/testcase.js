@@ -48,7 +48,7 @@ const repositoryApi = {
 
   async updateRepository(id, data) {
     try {
-      const response = await axios.put(`${BASE_URL}/repositories/${validateId(id)}/`, validateParams(data))
+      const response = await axios.patch(`${BASE_URL}/repositories/${validateId(id)}/`, validateParams(data))
       return response
     } catch (error) {
       handleApiError(error, 'TestCase')
@@ -140,9 +140,9 @@ const moduleApi = {
     }
   },
 
-  async getModuleTree(versionId) {
+  async getModuleTree(versionId, statType = 'testcase') {
     try {
-      const response = await axios.get(`${BASE_URL}/modules/tree/`, { params: { version: versionId } })
+      const response = await axios.get(`${BASE_URL}/modules/tree/`, { params: { version: versionId, stat_type: statType } })
       return response
     } catch (error) {
       handleApiError(error, 'TestCase')
@@ -150,9 +150,9 @@ const moduleApi = {
     }
   },
 
-  async getModuleStatistics(versionId) {
+  async getModuleStatistics(versionId, statType = 'testcase') {
     try {
-      const response = await axios.get(`${BASE_URL}/modules/statistics/`, { params: { version: versionId } })
+      const response = await axios.get(`${BASE_URL}/modules/statistics/`, { params: { version: versionId, stat_type: statType } })
       return response
     } catch (error) {
       handleApiError(error, 'TestCase')
@@ -578,8 +578,7 @@ const aiApi = {
    */
   generateTestCasesStream(data, callbacks) {
     const { onProgress, onRequest, onChunk, onComplete, onError } = callbacks
-    const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api'
-    const url = `${baseUrl}/testcase/ai/generate-stream/`
+    const url = `${axios.defaults.baseURL}/testcase/ai/generate-stream/`
 
     return createSSEStream({
       url,

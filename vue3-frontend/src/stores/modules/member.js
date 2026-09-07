@@ -56,45 +56,6 @@ export const useMemberStore = defineStore('member', () => {
       return members.value
     } catch (err) {
       error.value = err.message || '获取成员列表失败'
-
-      if (import.meta.env.DEV) {
-        const mockMembers = [
-          {
-            id: 1,
-            user_id: 101,
-            userId: 101,
-            name: '张三',
-            email: 'zhangsan@example.com',
-            avatar: '',
-            role: 'admin',
-            status: 'active',
-            joinedAt: '2024-01-15T10:00:00Z'
-          },
-          {
-            id: 2,
-            user_id: 102,
-            userId: 102,
-            name: '李四',
-            email: 'lisi@example.com',
-            avatar: '',
-            role: 'developer',
-            status: 'active',
-            joinedAt: '2024-01-16T14:30:00Z'
-          },
-          {
-            id: 3,
-            user_id: 103,
-            userId: 103,
-            name: '王五',
-            email: 'wangwu@example.com',
-            avatar: '',
-            role: 'tester',
-            status: 'active',
-            joinedAt: '2024-01-17T09:15:00Z'
-          }
-        ]
-        members.value = mockMembers
-      }
     } finally {
       loading.value = false
     }
@@ -279,32 +240,6 @@ export const useMemberStore = defineStore('member', () => {
       return invitations.value
     } catch (err) {
       error.value = err.message || '获取邀请列表失败'
-
-      if (import.meta.env.DEV) {
-        const mockInvitations = [
-          {
-            id: 1,
-            email: 'newuser1@example.com',
-            role: 'developer',
-            role_name: '开发者',
-            status: 'pending',
-            invited_by: '张三',
-            invited_at: '2024-01-20T10:00:00Z',
-            expires_at: '2024-01-27T10:00:00Z'
-          },
-          {
-            id: 2,
-            email: 'newuser2@example.com',
-            role: 'tester',
-            role_name: '测试人员',
-            status: 'pending',
-            invited_by: '李四',
-            invited_at: '2024-01-19T15:30:00Z',
-            expires_at: '2024-01-26T15:30:00Z'
-          }
-        ]
-        invitations.value = mockInvitations
-      }
     } finally {
       loading.value = false
     }
@@ -381,40 +316,6 @@ export const useMemberStore = defineStore('member', () => {
       return roles.value
     } catch (err) {
       error.value = err.message || '获取角色列表失败'
-
-      if (import.meta.env.DEV) {
-        const mockRoles = [
-          {
-            key: 'admin',
-            name: '管理员',
-            color: '#ef4444',
-            permissions: ['project_manage', 'member_manage', 'testcase_manage', 'testcase_view', 'bug_manage', 'bug_view', 'test_execute', 'report_view', 'settings_manage'],
-            memberCount: 1
-          },
-          {
-            key: 'developer',
-            name: '开发人员',
-            color: '#3b82f6',
-            permissions: ['testcase_view', 'bug_manage', 'bug_view', 'report_view'],
-            memberCount: 2
-          },
-          {
-            key: 'tester',
-            name: '测试人员',
-            color: '#22c55e',
-            permissions: ['testcase_manage', 'testcase_view', 'test_execute', 'bug_manage', 'bug_view', 'report_view'],
-            memberCount: 3
-          },
-          {
-            key: 'viewer',
-            name: '观察者',
-            color: '#6b7280',
-            permissions: ['testcase_view', 'report_view'],
-            memberCount: 0
-          }
-        ]
-        roles.value = mockRoles
-      }
     } finally {
       loading.value = false
     }

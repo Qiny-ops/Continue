@@ -1,0 +1,79 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+
+jobs:
+  # ---------- 微服务测试（阶段1 质量门禁：必须为绿） ----------
+  microservices:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        service: [api-testing-service, ai-generator-service]
+    defaults:
+      run:
+        working-directory: ${{ matrix.service }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt -r requirements-dev.txt
+      - name: Run tests
+        run: pytest -p no:cacheprovider -q
+
+  # ---------- Django 后端 ----------
+  django:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: Testbackend
+    env:
+      DJANGO_SETTINGS_MODULE: Testbackend.settings
+      # 测试以开发模式运行：settings 在 DEBUG=false 时会因缺少 WEKNORA_API_KEY 等
+      # 生产变量抛 ValueError，且会开启 SECURE_SSL_REDIRECT 影响 APIClient。
+      # conftest.py 已设 setdefault('DJANGO_DEBUG','true')，这里显式声明以便 CI 可读。
+      DJANGO_DEBUG: "true"
+      DJANGO_SECRET_KEY: ci-temporary-secret-key-not-for-production
+      JWT_SECRET: ci-temporary-jwt-secret-not-for-production
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt -r requirements-dev.txt
+      # 迁移漂移检查（硬门禁：模型改动必须同步生成迁移）
+      - name: Check migrations
+        run: python manage.py makemigrations --check --dry-run
+      # Django 单元测试（硬门禁）。pytest.ini 限定 testpaths=apps，
+      # 排除 tests/ 目录下的手动冒烟脚本；conftest.py 默认 DEBUG=true。
+      - name: Run Django tests
+        run: python -m pytest
+
+  # ---------- 依赖安全扫描（阶段2：软门禁，失败仅告警不阻断） ----------
+  dependency-audit:
+    runs-on: ubuntu-latest
+    needs: [microservices, django]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install pip-audit
+        run: python -m pip install --upgrade pip pip-audit
+      - name: Audit Django backend dependencies
+        # 软门禁：已知漏洞仅告警（--ignore… 可在确认误报后追加），不阻断合并
+        run: pip-audit -r Testbackend/requirements.txt -f json || true
+      - name: Audit microservice dependencies
+        run: |
+          pip-audit -r api-testing-service/requirements.txt -f json || true
+          pip-audit -r ai-generator-service/requirements.txt -f json || true

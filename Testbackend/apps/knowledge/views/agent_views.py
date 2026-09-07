@@ -10,6 +10,7 @@ from rest_framework.permissions import IsAuthenticated
 
 from apps.users.authentication import JWTAuthentication
 from apps.core.response import StandardResponse
+from apps.core.utils.helpers import safe_int
 from apps.knowledge.services import AgentService
 
 logger = logging.getLogger(__name__)
@@ -41,7 +42,7 @@ def create_session_view(request):
     result = AgentService.create_session(knowledge_base_id)
     if result.get('success'):
         return StandardResponse(data=result.get('data', {}), message='创建成功')
-    return StandardResponse(message=result.get('error', '创建失败'), code=500)
+    return StandardResponse(message=result.get('error', '创建失败'), code=result.get('http_status', 500))
 
 
 @api_view(['POST'])
@@ -86,14 +87,14 @@ def agent_chat_view(request, session_id):
         agent_id=request.data.get('agent_id', 'builtin-smart-reasoning'),
         web_search_enabled=request.data.get('web_search_enabled', False),
         temperature=float(request.data.get('temperature', 0.3)),
-        max_tokens=int(request.data.get('max_tokens', 4096)),
+        max_tokens=min(safe_int(request.data.get('max_tokens', 4096), default=4096), 32768),  # 上限 32K 防滥用
         kb_name_map=request.data.get('kb_name_map'),
         file_name_map=request.data.get('file_name_map'),
     )
 
     if result.get('success'):
         return StandardResponse(data=result.get('data', {}), message='操作成功')
-    return StandardResponse(message=result.get('error', '操作失败'), code=500)
+    return StandardResponse(message=result.get('error', '操作失败'), code=result.get('http_status', 500))
 
 
 @api_view(['POST'])
@@ -146,14 +147,14 @@ def extract_requirements_view(request):
         agent_id=request.data.get('agent_id', 'builtin-smart-reasoning'),
         web_search_enabled=request.data.get('web_search_enabled', False),
         temperature=float(request.data.get('temperature', 0.3)),
-        max_tokens=int(request.data.get('max_tokens', 4096)),
+        max_tokens=min(safe_int(request.data.get('max_tokens', 4096), default=4096), 32768),  # 上限 32K 防滥用
         kb_name_map=request.data.get('kb_name_map'),
         file_name_map=request.data.get('file_name_map'),
     )
 
     if result.get('success'):
         return StandardResponse(data=result.get('data', {}), message='提炼成功')
-    return StandardResponse(message=result.get('error', '提炼失败'), code=500)
+    return StandardResponse(message=result.get('error', '提炼失败'), code=result.get('http_status', 500))
 
 
 @api_view(['POST'])
@@ -210,4 +211,4 @@ def generate_test_cases_from_knowledge_view(request):
 
     if result.get('success'):
         return StandardResponse(data=result.get('data', {}), message='生成成功')
-    return StandardResponse(message=result.get('error', '生成失败'), code=500)
+    return StandardResponse(message=result.get('error', '生成失败'), code=result.get('http_status', 500))

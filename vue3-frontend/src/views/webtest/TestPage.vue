@@ -102,6 +102,11 @@
 <script setup>
 import { ref } from 'vue'
 import { ElMessage } from 'element-plus'
+import webAutoApi from '@/api/modules/webauto.js'
+
+const FRONTEND_BASE_URL = import.meta.env.VITE_FRONTEND_URL || 'http://localhost:5173'
+const API_TESTING_BASE_URL = import.meta.env.VITE_API_TESTING_URL || 'http://localhost:8002/api/v1'
+const getFrontendUrl = (path) => `${FRONTEND_BASE_URL}${path}`
 
 // 测试用例列表
 const testCases = ref([
@@ -109,7 +114,7 @@ const testCases = ref([
     id: 1,
     name: '用户登录验证',
     target: '本地系统',
-    base_url: 'http://localhost:5173/login',
+    base_url: getFrontendUrl('/login'),
     precondition: '无',
     steps: '1. 输入用户名admin\n2. 输入密码admin123\n3. 点击登录按钮',
     expected_result: '登录成功，跳转到项目列表页面',
@@ -120,9 +125,9 @@ const testCases = ref([
     id: 2,
     name: '项目列表查看',
     target: '本地系统',
-    base_url: 'http://localhost:5173/projects',
+    base_url: getFrontendUrl('/projects'),
     precondition: '已登录',
-    login_url: 'http://localhost:5173/login',
+    login_url: getFrontendUrl('/login'),
     username: 'admin',
     password: 'admin123',
     steps: '1. 查看项目列表\n2. 点击第一个项目进入详情',
@@ -134,9 +139,9 @@ const testCases = ref([
     id: 3,
     name: '测试用例创建',
     target: '本地系统',
-    base_url: 'http://localhost:5173/testcases',
+    base_url: getFrontendUrl('/testcases'),
     precondition: '已登录',
-    login_url: 'http://localhost:5173/login',
+    login_url: getFrontendUrl('/login'),
     username: 'admin',
     password: 'admin123',
     steps: '1. 点击新建测试用例\n2. 填写用例名称"登录验证测试"\n3. 填写用例描述\n4. 点击保存',
@@ -148,9 +153,9 @@ const testCases = ref([
     id: 4,
     name: '搜索功能验证',
     target: '本地系统',
-    base_url: 'http://localhost:5173/projects',
+    base_url: getFrontendUrl('/projects'),
     precondition: '已登录',
-    login_url: 'http://localhost:5173/login',
+    login_url: getFrontendUrl('/login'),
     username: 'admin',
     password: 'admin123',
     steps: '1. 在搜索框输入项目名称\n2. 点击搜索按钮\n3. 验证搜索结果',
@@ -162,9 +167,9 @@ const testCases = ref([
     id: 5,
     name: '用户个人设置',
     target: '本地系统',
-    base_url: 'http://localhost:5173/profile',
+    base_url: getFrontendUrl('/profile'),
     precondition: '已登录',
-    login_url: 'http://localhost:5173/login',
+    login_url: getFrontendUrl('/login'),
     username: 'admin',
     password: 'admin123',
     steps: '1. 进入个人设置页面\n2. 修改昵称\n3. 点击保存\n4. 验证修改成功',
@@ -176,9 +181,9 @@ const testCases = ref([
     id: 6,
     name: '项目成员管理',
     target: '本地系统',
-    base_url: 'http://localhost:5173/projects/1/members',
+    base_url: getFrontendUrl('/projects/1/members'),
     precondition: '已登录且有项目权限',
-    login_url: 'http://localhost:5173/login',
+    login_url: getFrontendUrl('/login'),
     username: 'admin',
     password: 'admin123',
     steps: '1. 点击添加成员\n2. 输入成员邮箱\n3. 选择角色\n4. 点击确认添加',
@@ -190,9 +195,9 @@ const testCases = ref([
     id: 7,
     name: 'API测试用例创建',
     target: '本地系统',
-    base_url: 'http://localhost:5173/apitest',
+    base_url: getFrontendUrl('/apitest'),
     precondition: '已登录',
-    login_url: 'http://localhost:5173/login',
+    login_url: getFrontendUrl('/login'),
     username: 'admin',
     password: 'admin123',
     steps: '1. 点击新建API测试\n2. 输入接口地址\n3. 选择请求方法\n4. 添加请求参数\n5. 点击保存',
@@ -204,9 +209,9 @@ const testCases = ref([
     id: 8,
     name: '知识库文档上传',
     target: '本地系统',
-    base_url: 'http://localhost:5173/knowledge',
+    base_url: getFrontendUrl('/knowledge'),
     precondition: '已登录',
-    login_url: 'http://localhost:5173/login',
+    login_url: getFrontendUrl('/login'),
     username: 'admin',
     password: 'admin123',
     steps: '1. 点击上传文档\n2. 选择文件\n3. 点击确认上传\n4. 等待上传完成',
@@ -218,9 +223,9 @@ const testCases = ref([
     id: 9,
     name: '测试报告查看',
     target: '本地系统',
-    base_url: 'http://localhost:5173/reports',
+    base_url: getFrontendUrl('/reports'),
     precondition: '已登录',
-    login_url: 'http://localhost:5173/login',
+    login_url: getFrontendUrl('/login'),
     username: 'admin',
     password: 'admin123',
     steps: '1. 进入测试报告列表\n2. 点击查看报告详情\n3. 验证报告内容',
@@ -232,9 +237,9 @@ const testCases = ref([
     id: 10,
     name: '用户退出登录',
     target: '本地系统',
-    base_url: 'http://localhost:5173/dashboard',
+    base_url: getFrontendUrl('/dashboard'),
     precondition: '已登录',
-    login_url: 'http://localhost:5173/login',
+    login_url: getFrontendUrl('/login'),
     username: 'admin',
     password: 'admin123',
     steps: '1. 点击用户头像\n2. 点击退出登录\n3. 确认退出',
@@ -249,84 +254,68 @@ const runningAll = ref(false)
 const resultDialogVisible = ref(false)
 const currentCase = ref(null)
 
-// 执行单个测试
+// 执行单个测试（对接 Web 自动化微服务：前端 → Django /webauto/execute/ → web-automation-service:8003）
+// 说明：原先该页面把请求打到了 api-testing-service(:8002)/api/v1/execute，而该端点根本不存在（404），
+// 导致每次点击「执行」都直接失败。现已改为走真正的 Web 自动化微服务。
 const runSingleTest = async (testCase) => {
   testCase.status = 'running'
   executing.value = true
 
-  // 构建请求参数，包含登录凭证
-  const requestBody = {
-    base_url: testCase.base_url,
-    precondition: testCase.precondition,
-    steps: testCase.steps,
-    expected_result: testCase.expected_result,
-    browser: 'chromium',
-    headless: false,
-    show_annotation: true
-  }
-
-  // 如果有登录凭证，添加到请求中
-  if (testCase.login_url) {
-    requestBody.login_url = testCase.login_url
-  }
-  if (testCase.username) {
-    requestBody.username = testCase.username
-  }
-  if (testCase.password) {
-    requestBody.password = testCase.password
-  }
+  const steps = []
+  const assertions = []
 
   try {
-    const response = await fetch('http://localhost:8003/api/v1/execute', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(requestBody)
-    })
-
-    const reader = response.body.getReader()
-    const decoder = new TextDecoder()
-    const steps = []
-    const assertions = []
-
-    const readStream = () => {
-      return reader.read().then(({ done, value }) => {
-        if (done) {
-          executing.value = false
-          // 判断最终状态：主要看操作步骤是否成功，断言只作为参考
-          const stepsSuccess = steps.every(s => s.success)
-          // 如果有断言，也检查断言结果；如果没有断言，只看操作步骤
-          const assertionsOk = assertions.length === 0 || assertions.some(a => a.success)
-          testCase.status = (stepsSuccess && assertionsOk) ? 'success' : 'failed'
-          testCase.result = { steps, assertions }
-          return
-        }
-
-        const chunk = decoder.decode(value, { stream: true })
-        const lines = chunk.split('\n')
-
-        for (const line of lines) {
-          if (line.startsWith('data: ')) {
-            try {
-              const event = JSON.parse(line.slice(6))
-              if (event.type === 'step' && event.data.seq) {
-                const idx = steps.findIndex(s => s.seq === event.data.seq)
-                if (idx >= 0) steps[idx] = event.data
-                else steps.push(event.data)
-              } else if (event.type === 'assertion') {
-                assertions.push(event.data)
-              }
-            } catch (e) {}
+    await new Promise((resolve, reject) => {
+      webAutoApi.executeCaseStream(
+        {
+          // 内联用例：复用 precondition / steps / expected_result
+          testcase: {
+            precondition: testCase.precondition || '',
+            steps: testCase.steps || '',
+            expected_result: testCase.expected_result || ''
+          },
+          // 起始 URL（用例里的 base_url 即目标站点地址）
+          start_url: testCase.base_url || '',
+          site_hint: testCase.siteHint || ''
+        },
+        (event) => {
+          const type = event?.type
+          const data = event?.data || {}
+          if (type === 'step') {
+            const a = data.action || {}
+            steps.push({
+              seq: steps.length + 1,
+              description: a.action || a.description || '',
+              action: a.action || '',
+              success: !!data.success,
+              error: data.error || '',
+              screenshot: data.screenshot || ''
+            })
+          } else if (type === 'report') {
+            // 微服务给出最终判定
+            testCase.status = data.passed ? 'success' : 'failed'
+          } else if (type === 'error') {
+            testCase.status = 'failed'
+            steps.push({
+              seq: steps.length + 1,
+              description: '执行失败',
+              action: '',
+              success: false,
+              error: data.message || '发生错误',
+              screenshot: ''
+            })
           }
-        }
-
-        return readStream()
-      })
-    }
-
-    await readStream()
+        },
+        (error) => reject(error),
+        () => resolve()
+      )
+    })
+    testCase.result = { steps, assertions }
   } catch (error) {
-    ElMessage.error('执行失败: ' + error.message)
+    ElMessage.error('执行失败: ' + (error?.message || '未知错误'))
     testCase.status = 'failed'
+    testCase.result = { steps, assertions }
+  } finally {
     executing.value = false
   }
 }

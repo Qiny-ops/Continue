@@ -353,14 +353,12 @@ class UserServiceExtended:
             logger.info(f"密码重置请求：邮箱 {email} 未注册")
             return
 
-        # 使用加密安全的随机生成器
-        import secrets
-        token = secrets.token_urlsafe(32)
-        user.reset_password_token = token
-        user.reset_password_expire = timezone.now() + timezone.timedelta(hours=24)
-        user.save()
+        # 使用 Django 内置的加密签名 token（无需存数据库，防泄露接管）
+        from django.contrib.auth.tokens import PasswordResetTokenGenerator
+        token_generator = PasswordResetTokenGenerator()
+        token = token_generator.make_token(user)
 
-        reset_url = f'{settings.FRONTEND_URL}/reset-password/{token}/'
+        reset_url = f'{settings.FRONTEND_URL}/reset-password/{user.id}/{token}/'
 
         try:
             send_mail(
@@ -375,17 +373,21 @@ class UserServiceExtended:
             # 不抛出异常，防止通过错误信息枚举用户
 
     @staticmethod
-    def reset_password(token, new_password):
-        """重置密码"""
+    def reset_password(user_id, token, new_password):
+        """重置密码 — 使用 Django PasswordResetTokenGenerator 加密签名验证"""
         if not new_password:
             raise ValidationError('新密码不能为空')
 
-        user = User.objects.filter(reset_password_token=token).first()
-        if not user:
+        from django.contrib.auth.tokens import PasswordResetTokenGenerator
+
+        try:
+            user = User.objects.get(id=user_id)
+        except User.DoesNotExist:
             raise ValidationError('无效的重置密码链接')
 
-        if user.reset_password_expire < timezone.now():
-            raise ValidationError('重置密码链接已过期')
+        token_generator = PasswordResetTokenGenerator()
+        if not token_generator.check_token(user, token):
+            raise ValidationError('无效或已过期的重置密码链接')
 
         is_valid, error_msg = PasswordService.validate_strength(new_password)
         if not is_valid:

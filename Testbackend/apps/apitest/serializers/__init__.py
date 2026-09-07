@@ -17,15 +17,41 @@ class ApiEnvironmentSerializer(serializers.ModelSerializer):
         help_text='项目 code'
     )
 
+    # 读取脱敏占位符：前端回传此值表示"不修改原凭据"
+    MASK = '****'
+
     class Meta:
         model = ApiEnvironment
         fields = [
-            'id', 'project', 'name', 'env_type', 'base_url', 'description',
+            'id', 'project', 'name', 'env_type', 'target_type', 'base_url', 'description',
             'auth_type', 'auth_token', 'auth_header', 'auth_username', 'auth_password',
             'default_headers', 'global_vars', 'is_default', 'is_active',
             'created_by', 'created_at', 'updated_at'
         ]
         read_only_fields = ['id', 'created_by', 'created_at', 'updated_at']
+
+    def to_representation(self, instance):
+        """读取时脱敏认证凭据，防止 GET 接口泄露明文密码/Token。"""
+        data = super().to_representation(instance)
+        for field in ('auth_token', 'auth_password', 'auth_username'):
+            if data.get(field):
+                data[field] = self.MASK
+        return data
+
+    def _strip_mask(self, validated_data):
+        """剔除回传的占位符字段，避免把 '****' 当成真实凭据写入/覆盖。"""
+        for field in ('auth_token', 'auth_password', 'auth_username'):
+            if validated_data.get(field) == self.MASK:
+                validated_data.pop(field, None)
+        return validated_data
+
+    def create(self, validated_data):
+        validated_data = self._strip_mask(validated_data)
+        return super().create(validated_data)
+
+    def update(self, instance, validated_data):
+        validated_data = self._strip_mask(validated_data)
+        return super().update(instance, validated_data)
 
 
 class ApiEnvironmentListSerializer(serializers.ModelSerializer):
@@ -33,16 +59,25 @@ class ApiEnvironmentListSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = ApiEnvironment
-        fields = ['id', 'name', 'env_type', 'base_url', 'is_default', 'is_active']
+        fields = ['id', 'name', 'env_type', 'target_type', 'base_url', 'is_default', 'is_active']
 
 
 class ApiTestCaseSerializer(serializers.ModelSerializer):
     """接口测试用例序列化器"""
 
+    def validate_status(self, value):
+        # 通过/失败只能由执行结果自动更新，禁止手动写入伪造结果
+        if value in ('passed', 'failed'):
+            raise serializers.ValidationError(
+                '通过/失败状态只能由执行结果自动更新，不能手动设置'
+            )
+        return value
+
     class Meta:
         model = ApiTestCase
         fields = [
-            'id', 'project', 'name', 'precondition', 'testpoint', 'expectation',
+            'id', 'project', 'version', 'module',
+            'name', 'precondition', 'testpoint', 'expectation',
             'priority', 'tags', 'test_data', 'run_list', 'status',
             'knowledge_base_id', 'source',
             'created_by', 'updated_by', 'created_at', 'updated_at'

@@ -31,7 +31,7 @@
           <el-icon :size="20">
             <component :is="item.icon" />
           </el-icon>
-          <span class="activity-name">{{ getShortName(item.tooltip) }}</span>
+          <span class="activity-name">{{ getShortName(item) }}</span>
           <span class="activity-tooltip" role="tooltip">{{ item.tooltip }}</span>
         </li>
       </ul>
@@ -162,6 +162,7 @@ const breadcrumbs = computed(() => {
 const routeMap = {
   '/projects': 'project',
   '/p/': 'project',
+  '/Agent_test': 'agent-test',
   '/system/': 'system'
 }
 
@@ -299,7 +300,7 @@ watch(() => route.path, updateActiveActivityFromRoute, { immediate: true })
 }
 
 .activity-name {
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 500;
   margin-top: 2px;
   color: inherit;

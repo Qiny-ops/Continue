@@ -164,7 +164,7 @@ class TestCaseService:
         """获取模块及其子模块的测试用例"""
         module = ModuleRepository.get_by_id(module_id)
         if not module:
-            return None, '模块不存在'
+            raise NotFoundError('模块不存在')
 
         module_ids = ModuleRepository.get_all_descendant_ids(module_id, module.version_id)
         queryset = TestCase.objects.filter(module_id__in=module_ids)
@@ -199,12 +199,12 @@ class TestCaseService:
 
         project = ProjectRepository.get_by_identifier(project_identifier)
         if not project:
-            return None, '项目不存在'
+            raise NotFoundError('项目不存在')
 
         if not is_system_admin(user):
             is_member, _, _ = ProjectMemberRepository.is_project_member(project.id, user)
             if not is_member:
-                return None, '您没有权限访问该项目'
+                raise BusinessError('您没有权限访问该项目')
 
         repositories = TestCaseRepository.objects.filter(project=project)
         if not repositories:
@@ -218,7 +218,7 @@ class TestCaseService:
             'version', 'module', 'created_by', 'updated_by'
         )
 
-        return queryset, None
+        return queryset
 
     @staticmethod
     @transaction.atomic
@@ -285,13 +285,13 @@ class TestCaseService:
         """
         # 检查版本是否已归档
         if test_case.version.status == 'archived':
-            return False, '该版本已归档，无法删除测试用例'
+            raise BusinessError('该版本已归档，无法删除测试用例')
 
         if not TestCaseService.check_version_permission(test_case.version, user, require_write=True):
-            return False, '您没有权限删除该测试用例'
+            raise BusinessError('您没有权限删除该测试用例')
 
         test_case.delete()
-        return True, None
+        return True
 
     @staticmethod
     @transaction.atomic
@@ -452,10 +452,10 @@ class TestCaseService:
         try:
             target_module = TestModule.objects.get(id=target_module_id)
         except TestModule.DoesNotExist:
-            return 0, '目标模块不存在'
+            raise NotFoundError('目标模块不存在')
 
         if not TestCaseService.check_version_permission(target_module.version, user, require_write=True):
-            return 0, '您没有权限移动到目标模块'
+            raise BusinessError('您没有权限移动到目标模块')
 
         cases = TestCase.objects.filter(id__in=ids)
 

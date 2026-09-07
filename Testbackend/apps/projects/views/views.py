@@ -12,6 +12,7 @@ from rest_framework.decorators import api_view, authentication_classes, permissi
 from rest_framework.permissions import IsAuthenticated
 
 from apps.core.response import StandardResponse
+from apps.core.utils.helpers import safe_int
 from apps.core.decorators import (
     require_project_member,
     require_project_admin,
@@ -40,8 +41,8 @@ def get_projects_view(request):
             'keyword': request.GET.get('keyword'),
             'is_favorite': request.GET.get('isFavorite')
         },
-        page=int(request.GET.get('page', 1)),
-        limit=int(request.GET.get('limit', 10))
+        page=safe_int(request.GET.get('page', 1), default=1),
+        limit=safe_int(request.GET.get('limit', 10), default=10)
     )
     return StandardResponse(data=result, message='获取成功')
 
@@ -50,11 +51,8 @@ def get_projects_view(request):
 @authentication_classes([JWTAuthentication])
 @permission_classes([IsAuthenticated])
 def get_project_view(request, project_identifier):
-    """获取项目详情"""
-    project_data, error = ProjectService.get_project(project_identifier, request.user)
-    if error:
-        code = 404 if '不存在' in error else 403
-        return StandardResponse(message=error, code=code)
+    """获取项目详情（失败时由 DRF 异常处理器统一返回错误响应）"""
+    project_data = ProjectService.get_project(project_identifier, request.user)
     return StandardResponse(data=project_data, message='获取成功')
 
 
@@ -63,10 +61,7 @@ def get_project_view(request, project_identifier):
 @permission_classes([IsAuthenticated])
 def create_project_view(request):
     """创建项目"""
-    project, error = ProjectService.create_project(request.user, request.data)
-    if error:
-        return StandardResponse(message=error, code=400)
-
+    project = ProjectService.create_project(request.user, request.data)
     project_data = ProjectService.build_project_data(project, False)
     return StandardResponse(data=project_data, message='创建成功')
 
@@ -77,11 +72,7 @@ def create_project_view(request):
 @require_project_permission('project_manage')
 def update_project_view(request, project_identifier):
     """更新项目"""
-    project, error = ProjectService.update_project(project_identifier, request.user, request.data)
-    if error:
-        code = 404 if '不存在' in error else 403
-        return StandardResponse(message=error, code=code)
-
+    project = ProjectService.update_project(project_identifier, request.user, request.data)
     project_data, _ = ProjectService.get_project(project_identifier, request.user)
     return StandardResponse(data=project_data, message='更新成功')
 
@@ -92,10 +83,7 @@ def update_project_view(request, project_identifier):
 @require_project_admin
 def delete_project_view(request, project_identifier):
     """删除项目"""
-    success, error = ProjectService.delete_project(project_identifier, request.user)
-    if error:
-        code = 404 if '不存在' in error else 403
-        return StandardResponse(message=error, code=code)
+    success = ProjectService.delete_project(project_identifier, request.user)
     return StandardResponse(message='删除成功')
 
 
@@ -105,9 +93,7 @@ def delete_project_view(request, project_identifier):
 def search_projects_view(request):
     """搜索项目"""
     keyword = request.GET.get('q', '')
-    results, error = ProjectService.search_projects(request.user, keyword)
-    if error:
-        return StandardResponse(message=error, code=400)
+    results = ProjectService.search_projects(request.user, keyword)
     return StandardResponse(data={'results': results}, message='搜索成功')
 
 
@@ -136,7 +122,7 @@ def get_dashboard_stats_view(request):
 @permission_classes([IsAuthenticated])
 def get_recent_projects_view(request):
     """获取最近访问的项目"""
-    limit = int(request.GET.get('limit', 6))
+    limit = safe_int(request.GET.get('limit', 6), default=6)
     projects = ProjectService.get_recent_projects(request.user, limit)
     return StandardResponse(data=projects, message='获取成功')
 
@@ -155,10 +141,7 @@ def get_todos_view(request):
 @permission_classes([IsAuthenticated])
 def update_visit_time_view(request, project_identifier):
     """更新项目访问时间"""
-    success, error = ProjectService.update_visit_time(project_identifier, request.user)
-    if error:
-        code = 404 if '不存在' in error else 403
-        return StandardResponse(message=error, code=code)
+    success = ProjectService.update_visit_time(project_identifier, request.user)
     return StandardResponse(message='更新成功')
 
 
@@ -169,11 +152,7 @@ def update_visit_time_view(request, project_identifier):
 @permission_classes([IsAuthenticated])
 def toggle_favorite_view(request, project_identifier):
     """切换收藏状态"""
-    is_favorite, error = ProjectMemberService.toggle_favorite(project_identifier, request.user)
-    if error:
-        code = 404 if '不存在' in error else 403
-        return StandardResponse(message=error, code=code)
-
+    is_favorite = ProjectMemberService.toggle_favorite(project_identifier, request.user)
     message = '收藏成功' if is_favorite else '取消收藏成功'
     return StandardResponse(data={'isFavorite': is_favorite}, message=message)
 
@@ -184,11 +163,7 @@ def toggle_favorite_view(request, project_identifier):
 def set_favorite_view(request, project_identifier):
     """设置收藏状态"""
     is_favorite = request.data.get('isFavorite', True)
-    result, error = ProjectMemberService.set_favorite(project_identifier, request.user, is_favorite)
-    if error:
-        code = 404 if '不存在' in error else 403
-        return StandardResponse(message=error, code=code)
-
+    result = ProjectMemberService.set_favorite(project_identifier, request.user, is_favorite)
     message = '收藏成功' if is_favorite else '取消收藏成功'
     return StandardResponse(data={'isFavorite': result}, message=message)
 
@@ -209,10 +184,7 @@ def get_favorite_projects_view(request):
 @permission_classes([IsAuthenticated])
 def get_project_members_view(request, project_identifier):
     """获取项目成员列表"""
-    members_data, error = ProjectMemberService.get_members(project_identifier, request.user)
-    if error:
-        code = 404 if '不存在' in error else 403
-        return StandardResponse(message=error, code=code)
+    members_data = ProjectMemberService.get_members(project_identifier, request.user)
     return StandardResponse(data={'members': members_data}, message='获取成功')
 
 
@@ -222,16 +194,13 @@ def get_project_members_view(request, project_identifier):
 @require_project_permission('member_manage')
 def add_project_member_view(request, project_identifier):
     """添加项目成员"""
-    member_data, error = ProjectMemberService.add_member(
+    member_data = ProjectMemberService.add_member(
         project_identifier=project_identifier,
         operator=request.user,
         user_id=request.data.get('userId'),
         role=request.data.get('role', 'viewer'),
         status=request.data.get('status', 'active')
     )
-    if error:
-        code = 404 if '不存在' in error else 400
-        return StandardResponse(message=error, code=code)
     return StandardResponse(data=member_data, message='添加成功')
 
 
@@ -241,15 +210,12 @@ def add_project_member_view(request, project_identifier):
 @require_project_permission('member_manage')
 def update_project_member_view(request, project_identifier, member_id):
     """更新成员信息"""
-    member_data, error = ProjectMemberService.update_member(
+    member_data = ProjectMemberService.update_member(
         project_identifier=project_identifier,
         operator=request.user,
         member_id=member_id,
         data=request.data
     )
-    if error:
-        code = 404 if '不存在' in error else 400
-        return StandardResponse(message=error, code=code)
     return StandardResponse(data=member_data, message='更新成功')
 
 
@@ -259,14 +225,11 @@ def update_project_member_view(request, project_identifier, member_id):
 @require_project_permission('member_manage')
 def remove_project_member_view(request, project_identifier, member_id):
     """移除成员"""
-    success, error = ProjectMemberService.remove_member(
+    success = ProjectMemberService.remove_member(
         project_identifier=project_identifier,
         operator=request.user,
         member_id=member_id
     )
-    if error:
-        code = 404 if '不存在' in error else 400
-        return StandardResponse(message=error, code=code)
     return StandardResponse(message='移除成功')
 
 
@@ -278,15 +241,12 @@ def batch_update_members_view(request, project_identifier):
     """批量更新成员"""
     # 支持两种参数名：member_ids (推荐) 和 memberIds (兼容)
     member_ids = request.data.get('member_ids', request.data.get('memberIds', []))
-    updated_count, error = ProjectMemberService.batch_update_members(
+    updated_count = ProjectMemberService.batch_update_members(
         project_identifier=project_identifier,
         operator=request.user,
         member_ids=member_ids,
         data=request.data
     )
-    if error:
-        code = 404 if '不存在' in error else 400
-        return StandardResponse(message=error, code=code)
     return StandardResponse(data={'updatedCount': updated_count}, message=f'成功更新 {updated_count} 个成员')
 
 
@@ -297,10 +257,7 @@ def batch_update_members_view(request, project_identifier):
 @permission_classes([IsAuthenticated])
 def get_project_roles_view(request, project_identifier):
     """获取项目角色列表"""
-    roles_data, error = ProjectRoleService.get_project_roles(project_identifier, request.user)
-    if error:
-        code = 404 if '不存在' in error else 403
-        return StandardResponse(message=error, code=code)
+    roles_data = ProjectRoleService.get_project_roles(project_identifier, request.user)
     return StandardResponse(data=roles_data, message='获取成功')
 
 
@@ -316,16 +273,12 @@ def update_project_role_view(request, project_identifier, role_key):
     permissions = request.data.get('permissions', [])
     logger.info(f"update_project_role_view: project={project_identifier}, role_key={role_key}, permissions={permissions}")
 
-    success, error = ProjectRoleService.update_role_permissions(
+    success = ProjectRoleService.update_role_permissions(
         project_identifier=project_identifier,
         operator=request.user,
         role_key=role_key,
         permissions=permissions
     )
-    if error:
-        logger.error(f"update_project_role_view error: {error}")
-        code = 404 if '不存在' in error else 400
-        return StandardResponse(message=error, code=code)
     return StandardResponse(data={'key': role_key, 'permissions': permissions}, message='权限更新成功')
 
 
@@ -338,15 +291,11 @@ def create_project_role_view(request, project_identifier):
     import logging
     logger = logging.getLogger(__name__)
 
-    role_data, error = ProjectRoleService.create_project_role(
+    role_data = ProjectRoleService.create_project_role(
         project_identifier=project_identifier,
         operator=request.user,
         data=request.data
     )
-    if error:
-        logger.error(f"create_project_role_view error: {error}")
-        code = 404 if '不存在' in error else 400
-        return StandardResponse(message=error, code=code)
     return StandardResponse(data=role_data, message='角色创建成功')
 
 
@@ -371,14 +320,11 @@ def get_permissions_view(request):
 def get_project_activities_view(request, project_identifier):
     """获取项目动态"""
     limit = int(request.query_params.get('limit', 10))
-    activities, error = ProjectMemberService.get_project_activities(
+    activities, _ = ProjectMemberService.get_project_activities(
         project_identifier=project_identifier,
         user=request.user,
         limit=limit
     )
-    if error:
-        code = 404 if '不存在' in error else 403
-        return StandardResponse(message=error, code=code)
     return StandardResponse(data={'activities': activities}, message='获取成功')
 
 
@@ -435,10 +381,7 @@ def get_my_permissions_view(request, project_identifier):
 @permission_classes([IsAuthenticated])
 def get_project_knowledge_base_view(request, project_identifier):
     """获取项目关联的知识库信息"""
-    kb_data, error = ProjectService.get_project_knowledge_base(project_identifier, request.user)
-    if error:
-        code = 404 if '不存在' in error else 403 if '权限' in error else 500
-        return StandardResponse(message=error, code=code)
+    kb_data = ProjectService.get_project_knowledge_base(project_identifier, request.user)
     if kb_data is None:
         return StandardResponse(data=None, message='项目未关联知识库')
     return StandardResponse(data=kb_data, message='获取成功')
@@ -451,10 +394,7 @@ def link_knowledge_base_view(request, project_identifier):
     """关联知识库到项目"""
     kb_id = request.data.get('knowledgeBaseId')
     kb_name = request.data.get('knowledgeBaseName')
-    result, error = ProjectService.link_knowledge_base(project_identifier, request.user, kb_id, kb_name)
-    if error:
-        code = 404 if '不存在' in error else 403 if '权限' in error else 400
-        return StandardResponse(message=error, code=code)
+    result = ProjectService.link_knowledge_base(project_identifier, request.user, kb_id, kb_name)
     return StandardResponse(data=result, message='关联成功')
 
 
@@ -463,10 +403,7 @@ def link_knowledge_base_view(request, project_identifier):
 @permission_classes([IsAuthenticated])
 def unlink_knowledge_base_view(request, project_identifier):
     """解除知识库关联"""
-    success, error = ProjectService.unlink_knowledge_base(project_identifier, request.user)
-    if error:
-        code = 404 if '不存在' in error else 403
-        return StandardResponse(message=error, code=code)
+    success = ProjectService.unlink_knowledge_base(project_identifier, request.user)
     return StandardResponse(message='解除关联成功')
 
 
@@ -477,10 +414,7 @@ def create_project_knowledge_base_view(request, project_identifier):
     """为项目创建并关联知识库"""
     kb_name = request.data.get('name')
     kb_description = request.data.get('description')
-    result, error = ProjectService.create_project_knowledge_base(
+    result = ProjectService.create_project_knowledge_base(
         project_identifier, request.user, kb_name, kb_description
     )
-    if error:
-        code = 404 if '不存在' in error else 403 if '权限' in error else 400
-        return StandardResponse(message=error, code=code)
     return StandardResponse(data=result, message='知识库创建并关联成功')

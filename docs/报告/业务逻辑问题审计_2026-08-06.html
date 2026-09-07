@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>业务逻辑问题审计报告 — TestFlow</title>
+<style>
+:root { --bg: #fff; --text: #2c3e50; --text-secondary: #5a6a7e; --border: #e2e8f0; --critical: #dc3545; --critical-bg: #fff5f5; --high: #e67e22; --high-bg: #fff8f1; --medium: #f0ad4e; --medium-bg: #fffdf5; --card-shadow: 0 1px 3px rgba(0,0,0,.08); --code-bg: #f7fafc; --accent: #667eea; }
+* { margin:0; padding:0; box-sizing:border-box; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; color:var(--text); background:var(--bg); line-height:1.7; }
+.container { max-width: 1100px; margin:0 auto; padding: 20px; }
+.header { background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%); color: #fff; padding: 60px 20px; text-align: center; }
+.header h1 { font-size: 2.2em; font-weight: 800; margin-bottom: 8px; }
+.header .subtitle { color: #a8b2d1; font-size: 1.1em; }
+.section { margin: 40px 0; }
+.section h2 { font-size: 1.5em; color: #1a1a2e; border-bottom: 3px solid var(--accent); padding-bottom: 8px; margin-bottom: 20px; }
+.section h3 { font-size: 1.1em; color: #34495e; margin: 20px 0 10px; }
+.issue { border: 1px solid var(--border); border-radius: 8px; padding: 16px 20px; margin: 14px 0; box-shadow: var(--card-shadow); }
+.issue .severity { display: inline-block; padding: 2px 10px; border-radius: 4px; font-size: .75em; font-weight: 700; margin-right: 8px; }
+.issue .severity.crit { background: var(--critical); color: #fff; }
+.issue .severity.high { background: var(--high); color: #fff; }
+.issue .severity.med { background: var(--medium); color: #1a1a2e; }
+.issue .title { font-size: 1.05em; font-weight: 700; margin: 8px 0; }
+.issue .root { padding: 6px 10px; background: var(--code-bg); border-radius: 4px; font-family: monospace; font-size: .85em; margin: 6px 0; }
+.issue .impact { font-size: .85em; padding: 6px 10px; border-radius: 4px; margin: 8px 0; }
+.issue .impact.crit-bg { background: var(--critical-bg); border-left: 3px solid var(--critical); }
+.issue .impact.high-bg { background: var(--high-bg); border-left: 3px solid var(--high); }
+.issue .impact.med-bg { background: var(--medium-bg); border-left: 3px solid var(--medium); }
+.fix { background: #f0faf0; border-left: 3px solid #27ae60; padding: 10px 14px; border-radius: 4px; margin: 8px 0; font-size: .9em; }
+.summary-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 10px; margin: 24px 0; }
+.summary-card { border-radius: 10px; padding: 16px; box-shadow: var(--card-shadow); border: 1px solid var(--border); text-align: center; }
+.summary-card .count { font-size: 2em; font-weight: 800; }
+.summary-card .label { font-size: .85em; color: var(--text-secondary); }
+.summary-card.critical { border-left: 4px solid var(--critical); } .summary-card.critical .count { color: var(--critical); }
+.summary-card.high { border-left: 4px solid var(--high); } .summary-card.high .count { color: var(--high); }
+.summary-card.medium { border-left: 4px solid var(--medium); } .summary-card.medium .count { color: var(--medium); }
+table { width: 100%; border-collapse: collapse; margin: 16px 0; }
+th, td { padding: 8px 12px; text-align: left; border-bottom: 1px solid var(--border); font-size: .88em; }
+th { background: #f8fafc; font-weight: 700; }
+tr:hover { background: #f8fafc; }
+.domain-tag { display: inline-block; padding: 2px 8px; border-radius: 3px; font-size: .75em; margin-right: 4px; }
+</style>
+</head>
+<body>
+<div class="header">
+  <h1>业务逻辑问题审计报告</h1>
+  <div class="subtitle">TestFlow 测试管理平台 — 6 功能域 / 10 项逻辑缺陷</div>
+</div>
+
+<div class="container">
+
+<div class="summary-cards">
+  <div class="summary-card critical"><div class="count">2</div><div class="label">严重 (Critical)</div></div>
+  <div class="summary-card high"><div class="count">4</div><div class="label">高危 (High)</div></div>
+  <div class="summary-card medium"><div class="count">4</div><div class="label">中危 (Medium)</div></div>
+</div>
+
+<div class="section">
+<h2>🔴 严重 (Critical) — 数据安全 + 完整性崩溃</h2>
+
+<div class="issue">
+  <span class="severity crit">Critical</span>
+  <span class="domain-tag" style="background:#fce4ec;color:#c62828;">接口测试</span>
+  <div class="title">1. 环境凭证明文存储 — 安全漏洞</div>
+  <div class="root">apitest/models.py ApiEnvironment: auth_token / auth_username / auth_password — 均为 TextField/CharField 明文</div>
+  <div class="desc">
+    API 测试环境的认证凭据（Token、用户名、密码）以明文形式存储在数据库中。序列化器直接暴露这些字段，任何 GET 请求都会返回完整凭据。生产环境 Base URL + Token 的组合被DBA、备份运维、SQL 注入攻击者直接获取。
+  </div>
+  <div class="impact crit-bg">
+    <strong>风险</strong>: 攻破测试环境凭据 → 横向渗透生产环境（因为测试/预发布环境往往使用相似凭据策略）
+  </div>
+  <div class="fix">
+    <strong>已修复（双层）</strong>:
+    <br>① <u>存储层</u>：新增 <code>apps/apitest/fields.py</code>，基于 <code>cryptography.fernet</code> 实现 <code>EncryptedCharField/EncryptedTextField</code>；<code>auth_token/auth_username/auth_password</code> 落库为密文（Fernet 对称加密，密钥来自 <code>settings.DB_FIELD_ENCRYPTION_KEY</code>，缺省由 SECRET_KEY 派生）。迁移 <code>0003</code>（字段切换）+ <code>0004</code>（历史明文凭据重加密，幂等）已生成并应用到开发库，验证 DB 存 <code>gAAAAA…</code> 密文、ORM 读明文。
+    <br>② <u>序列化层</u>：读取时脱敏为 <code>****</code>；并修复回传占位符 <code>****</code> 会被当成真实凭据覆盖原值的缺陷（<code>create/update</code> 剔除占位符字段）。
+    <br>③ <code>requirements.txt</code> 加 <code>cryptography==50.0.0</code>；<code>.env</code>/<code>.env.example</code> 加 <code>DB_FIELD_ENCRYPTION_KEY</code>（生产须独立生成并保密）。
+  </div>
+</div>
+
+<div class="issue">
+  <span class="severity crit">Critical</span>
+  <span class="domain-tag" style="background:#f3e5f5;color:#6a1b9a;">测试用例</span>
+  <div class="title">2. TestCase.version ≠ TestCase.module.version — 数据一致性无约束</div>
+  <div class="root">testcase/models/test_case.py: TestCase 同时有 version FK 和 module FK，但模块自己的 version 可能与用例 version 不同</div>
+  <div class="desc">
+    模块属于某个版本，用例也属于某个版本。但没有任何数据库约束或 Python save() 校验保证 <code>case.version_id == case.module.version_id</code>。通过 Django Admin、Shell、或批量更新 API 可以直接创建跨版本的"幽灵用例"——用例在 v2.0，但模块在 v1.0。
+  </div>
+  <div class="impact crit-bg">
+    <strong>风险</strong>: 按版本查询时漏掉或用例重复；模块树统计失真；导出报告数据矛盾
+  </div>
+  <div class="fix">
+    <strong>修复</strong>: 在 TestCase.save() 中检测 module 变化时强制同步 version = module.version；或添加 DB CheckConstraint（PostgreSQL）让 version 成为从 module 派生的计算字段
+  </div>
+</div>
+</div>
+
+<div class="section">
+<h2>🟠 高危 (High) — 流程可被绕过 / 操作无防护</h2>
+
+<div class="issue">
+  <span class="severity high">High</span>
+  <span class="domain-tag" style="background:#fff3e0;color:#e65100;">项目管理</span>
+  <div class="title">3. Project 状态机完全缺失</div>
+  <div class="root">projects/models/project.py: STATUS_CHOICES 仅用于展示，无任何状态转换守卫</div>
+  <div class="desc">
+    项目状态（active/completed/pending/archived）可任意转换：已归档的可以"复活"、已完成的可以重新"激活"、pending 可以直接跳到 archived。update_project API 直接把 status 值写入数据库，不做任何校验。
+  </div>
+  <div class="impact high-bg">
+    <strong>风险</strong>: 前端可能对"已完成/已归档"做了 UI 限制，但 API 层面可绕过。已完成项目的用例被人为重新激活修改，审计完整性破坏。
+  </div>
+  <div class="fix">
+    <strong>修复</strong>: 实现状态机：pending → active → completed/archived（单向不可逆）；update_project 中校验 status 转换合法性
+  </div>
+</div>
+
+<div class="issue">
+  <span class="severity high">High</span>
+  <span class="domain-tag" style="background:#e8f5e9;color:#2e7d32;">接口测试</span>
+  <div class="title">4. ApiTestCase.status 可手动写入 + 异常路径不更新</div>
+  <div class="root">apitest/models.py: status 是存储字段且不在 read_only_fields；api_testcase.py: error/断连路径不更新 status</div>
+  <div class="desc">
+    三个独立问题：(a) status 字段可通过 PUT/PATCH API 直接写入，用户可以手动把用例标记为 passed 而不执行；(b) SSE 执行出错（error 事件）只更新 ApiTestRun.result，不更新 ApiTestCase.status；(c) SSE 连接中断时 status 永远停在旧值。
+  </div>
+  <div class="impact high-bg">
+    <strong>风险</strong>: 统计报表不可靠（人为标记"已通过"的用例拉高通过率）；错误/中断的用例显示为旧状态；审计追溯断裂
+  </div>
+  <div class="fix">
+    <strong>已修复</strong>: ① 序列化器 <code>validate_status</code> 禁止手动写入 passed/failed；② 提取统一 <code>finalize_run()</code> 收口函数，所有 run 结束路径（依赖分析失败 / 执行出错 / SSE 异常中断）均经此更新 <code>status</code>；③ 为 SSE 生成器增加顶层 <code>try/except</code>，连接中断或微服务异常时 <code>run.result='error'</code> 且用例 status 同步为 failed，不再卡在旧值/running。
+  </div>
+  <div class="impact med-bg">
+    <strong>设计决策</strong>: 未将 status 改为从 latest_run 派生的 computed property（避免迁移 + 保留按 status 的 DB 过滤/列表查询）。改为"仅由执行结果写入"的强约束，等价达成审计目标且风险更低。
+  </div>
+</div>
+
+<div class="issue">
+  <span class="severity high">High</span>
+  <span class="domain-tag" style="background:#e3f2fd;color:#1565c0;">知识库</span>
+  <div class="title">5. 知识库删除后多处悬空引用</div>
+  <div class="root">4张表持有 knowledge_base_id CharField: Project / ApiTestCase / Requirement / AIGenerationRecord</div>
+  <div class="desc">
+    删除知识库时仅调用 WeKnora API 删除远端资源，但完全不扫描/清理本地数据库中的引用。删除后 Project.knowledge_base_id、ApiTestCase.knowledge_base_id 等仍指向已不存在的 KB ID。后续使用这些值调用 WeKnora API 会返回 404。
+  </div>
+  <div class="impact high-bg">
+    <strong>风险</strong>: 关联了知识库的项目/用例/需求/AI记录全部分失效；用户体验到"知识库不存在"错误却不知道哪个项目出问题
+  </div>
+  <div class="fix">
+    <strong>修复</strong>: 删除知识库前扫描所有引用表，生成影响报告；删除时级联 SET_NULL 所有引用或阻止删除
+  </div>
+</div>
+
+<div class="issue">
+  <span class="severity high">High</span>
+  <span class="domain-tag" style="background:#f3e5f5;color:#6a1b9a;">测试用例</span>
+  <div class="title">6. 批量删除模块时跳过用例权限检查</div>
+  <div class="root">testcase/services/module_service.py:183 — 直接 TestCase.objects.filter(module_id__in=ids).delete()</div>
+  <div class="desc">
+    删除模块时可连带删除模块下的所有用例。但此操作完全跳过权限检查——不验证当前用户对每个用例是否有删除权限（对比 batch_delete_test_cases 会逐个检查 version 权限）。也不检查用例所属版本是否已归档。
+  </div>
+  <div class="impact high-bg">
+    <strong>风险</strong>: 普通成员删除模块时连带删掉管理员创建的用例；归档版本下的用例本应冻结但被连带删除
+  </div>
+  <div class="fix">
+    <strong>修复</strong>: 逐用例权限检查；归档版本下的模块/用例禁止删除；ApiTestCase 的 module FK 同步 SET_NULL
+  </div>
+</div>
+</div>
+
+<div class="section">
+<h2>🟡 中危 (Medium) — 流程缺陷 / 数据漂移</h2>
+
+<div class="issue">
+  <span class="severity med">Medium</span>
+  <span class="domain-tag" style="background:#f3e5f5;color:#6a1b9a;">测试用例</span>
+  <div class="title">7. 评审轮次无上限 — 无限驳回循环</div>
+  <div class="root">testcase/services/review_service.py:211 — revision_number 无条件递增，无 MAX_REVISION_COUNT</div>
+  <div class="desc">
+    用例评审可以无限循环：创建→驳回→修改→重提→驳回→...。每轮都保留完整 Review 记录，没有"多次驳回后自动标记为废弃"的机制。
+  </div>
+  <div class="impact med-bg"><strong>风险</strong>: 数据库 Review 表膨胀；无法追踪"共识永远无法达成"的争议用例</div>
+  <div class="fix"><strong>修复</strong>: 设置 MAX_REVISION_COUNT=5，超限后标记用例为 obsolete 或要求管理员裁决</div>
+</div>
+
+<div class="issue">
+  <span class="severity med">Medium</span>
+  <span class="domain-tag" style="background:#f3e5f5;color:#6a1b9a;">测试用例</span>
+  <div class="title">8. 删除 TestCase 时 AIGenerationRecord 成为孤儿</div>
+  <div class="root">testcase/models: AIGenerationRecord.test_case FK → on_delete=SET_NULL</div>
+  <div class="desc">
+    删除用例时，关联的 AI 生成记录不会删除（CASCADE vs SET_NULL 策略不一致）。对比 TestCaseReview 和 TestCaseExecution 都是 CASCADE。
+  </div>
+  <div class="impact med-bg"><strong>风险</strong>: 孤儿 AI 记录累积，无法追踪"这个 AI 生成最终产生了什么用例"</div>
+  <div class="fix"><strong>修复</strong>: 统一为 CASCADE，或删除时提示"N 条 AI 生成记录将保留"</div>
+</div>
+
+<div class="issue">
+  <span class="severity med">Medium</span>
+  <span class="domain-tag" style="background:#fce4ec;color:#c62828;">需求管理</span>
+  <div class="title">9. 删除需求时无关联用例预警</div>
+  <div class="root">requirement/models: TestCase.requirement FK → on_delete=SET_NULL</div>
+  <div class="desc">
+    Requirement.delete() 没有覆盖，删除前不检查有多少 TestCase 关联了此需求。需求一删，所有关联用例的 requirement 字段静默变 NULL。测试人员事后发现"需求关联怎么没了"，无法追溯。
+  </div>
+  <div class="impact med-bg"><strong>风险</strong>: 需求追溯链断裂；需求覆盖度统计受影响</div>
+  <div class="fix"><strong>修复</strong>: Requirement.delete() 覆盖 → 检查关联用例数 → 前端弹窗告警或阻止直接删除</div>
+</div>
+
+<div class="issue">
+  <span class="severity med">Medium</span>
+  <span class="domain-tag" style="background:#fff3e0;color:#e65100;">跨模块</span>
+  <div class="title">10. ApiTestCase 和 TestCase 的版本/模块 ID 各自独立 <span class="tag ok" style="margin-left:8px;">已闭环</span></div>
+  <div class="root">apitest/models.py + testcase/models: 两者均持有指向同一 TestCaseVersion / TestModule 的 FK，但 ApiTestCase 缺 save() 级版本同步</div>
+  <div class="desc">
+    ApiTestCase（接口测试用例）和 TestCase（手工测试用例）共享<strong>同一套</strong>版本/模块模型（非完全独立），但 ApiTestCase 此前没有 TestCase 那样的 save() 版本同步逻辑：同一模块下，手工用例已被 #2 强制对齐到模块版本，接口用例的 version 却可能停留在旧值或为空，导致按版本统计时两端对不上。
+  </div>
+  <div class="impact med-bg"><strong>风险</strong>: 跨类型统计口径不一致；测试覆盖率评估失真</div>
+  <div class="fix"><strong>已修复（版本一致性）</strong>: <code>ApiTestCase.save()</code> 增加与 TestCase #2 完全一致的同步——module 已设置时强制 <code>version = module.version</code>，仅在 module 为空时保留显式版本（不覆盖"未归模块"合法态）。新增管理命令 <code>sync_api_case_versions</code>（支持 <code>--dry-run</code>）回填历史不一致数据。</div>
+  <div class="note keep-bg" style="font-size:.85em;"><strong>待业务确认（非缺陷）</strong>: 审计原建议的"显式 1:1 对应字段"需以真实业务关系为前提（API 用例与手工用例未必一一对应）。当前两者按<strong>版本/模块体系统一归口</strong>已实现统计口径一致，未臆造可能误导的死字段；若后续确认需要逐条对应关系，再追加 <code>ApiTestCase.test_case</code> 可选 FK。</div>
+</div>
+</div>
+
+<div class="section">
+<h2>汇总</h2>
+<table>
+  <tr><th>#</th><th>问题</th><th>严重度</th><th>域</th><th>根因</th></tr>
+  <tr style="background:#fff5f5"><td>1</td><td>环境凭证明文存储</td><td>CRITICAL</td><td>接口测试</td><td>无加密存储方案</td></tr>
+  <tr style="background:#fff5f5"><td>2</td><td>Version/Module 可不一致</td><td>CRITICAL</td><td>测试用例</td><td>无约束/校验</td></tr>
+  <tr style="background:#fff8f1"><td>3</td><td>Project 状态机缺失</td><td>HIGH</td><td>项目管理</td><td>无状态守卫</td></tr>
+  <tr style="background:#fff8f1"><td>4</td><td>ApiTestCase.status 不可靠</td><td>HIGH</td><td>接口测试</td><td>存储字段+错误路径缺更新</td></tr>
+  <tr style="background:#fff8f1"><td>5</td><td>知识库悬空引用</td><td>HIGH</td><td>知识库</td><td>删除不级联清理</td></tr>
+  <tr style="background:#fff8f1"><td>6</td><td>模块删除跳过权限</td><td>HIGH</td><td>测试用例</td><td>直接delete()</td></tr>
+  <tr style="background:#fffdf5"><td>7</td><td>评审轮次无上限</td><td>MEDIUM</td><td>测试用例</td><td>无上限检查</td></tr>
+  <tr style="background:#fffdf5"><td>8</td><td>AIGenerationRecord 孤儿</td><td>MEDIUM</td><td>测试用例</td><td>SET_NULL不一致</td></tr>
+  <tr style="background:#fffdf5"><td>9</td><td>需求删除无预警</td><td>MEDIUM</td><td>需求管理</td><td>无前置检查</td></tr>
+  <tr style="background:#fffdf5"><td>10</td><td>跨模型 ID 各自独立</td><td>MEDIUM</td><td>跨模块</td><td>无同步机制</td></tr>
+</table>
+
+<h3>按功能域分布</h3>
+<table>
+  <tr><th>域</th><th>Critical</th><th>High</th><th>Medium</th><th>合计</th></tr>
+  <tr><td>测试用例管理</td><td>1</td><td>1</td><td>2</td><td>4</td></tr>
+  <tr><td>接口测试管理</td><td>1</td><td>1</td><td>-</td><td>2</td></tr>
+  <tr><td>项目管理</td><td>-</td><td>1</td><td>-</td><td>1</td></tr>
+  <tr><td>知识库</td><td>-</td><td>1</td><td>-</td><td>1</td></tr>
+  <tr><td>需求管理</td><td>-</td><td>-</td><td>1</td><td>1</td></tr>
+  <tr><td>跨模块</td><td>-</td><td>-</td><td>1</td><td>1</td></tr>
+</table>
+</div>
+
+</div>
+</body>
+</html>

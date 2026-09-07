@@ -26,7 +26,7 @@
             @edit-module="handleEditModule"
             @delete-module="handleDeleteModule"
             @node-click="handleModuleClick"
-            @show-all-cases="handleShowAllCases"
+            @show-all-cases="handleShowAll"
             @refresh="handleModuleRefresh"
           />
           <div class="sidebar-toggle" @click="sidebarCollapsed = !sidebarCollapsed">
@@ -383,6 +383,31 @@
       </template>
     </el-dialog>
 
+    <!-- 提交重审对话框（被驳回用例编辑保存后弹出） -->
+    <el-dialog
+      v-model="resubmitVisible"
+      title="提交重审"
+      width="440px"
+      @close="resubmitNote = ''; pendingResubmitCaseId = null"
+    >
+      <div class="resubmit-tip">
+        <el-icon><InfoFilled /></el-icon>
+        <span>该用例此前被驳回，已保存修改。确认后将以「修改后待重审」状态重新进入评审流程。</span>
+      </div>
+      <el-input
+        v-model="resubmitNote"
+        type="textarea"
+        :rows="3"
+        maxlength="500"
+        show-word-limit
+        placeholder="请填写本次修改说明（可选）"
+      />
+      <template #footer>
+        <el-button @click="resubmitVisible = false">暂不提交</el-button>
+        <el-button type="primary" :loading="resubmitSubmitting" @click="confirmResubmit">提交重审</el-button>
+      </template>
+    </el-dialog>
+
     <!-- AI 生成对话框 -->
     <AIGenerateDialog
       v-model:visible="aiGenerateVisible"
@@ -392,6 +417,13 @@
       :project-id="project?.id"
       @generated="handleAIGenerated"
       @go-to-knowledge="handleGoToKnowledge"
+    />
+
+    <!-- Web 自动化执行对话框 -->
+    <WebExecuteDialog
+      v-model:visible="webExecuteVisible"
+      :cases="webExecuteCases"
+      :project-id="project?.id"
     />
   </div>
 </template>
@@ -407,13 +439,13 @@ import ModuleTree from '@/views/testcase/components/ModuleTree.vue'
 import TestCaseTable from '@/views/testcase/components/TestCaseTable.vue'
 import TestCaseDialog from '@/views/testcase/components/TestCaseDialog.vue'
 import AIGenerateDialog from '@/views/testcase/components/AIGenerateDialog.vue'
+import WebExecuteDialog from '@/views/projects/components/WebExecuteDialog.vue'
 
 import { DEFAULT_TEST_CASE_FORM } from '@/constants/testcase'
-import {
-  useRepositoryAndVersion,
-  useModuleTree,
-  useTestCases
-} from '@/composables/testcase/useTestCaseApi'
+import { useTestCases } from '@/composables/testcase/useTestCaseApi'
+import { useRepoVersionModuleTree } from '@/composables/testcase/useRepoVersionModuleTree'
+import { useTestCaseReview } from '@/composables/testcase/useTestCaseReview'
+import { useBatchOperation } from '@/composables/testcase/useBatchOperation'
 import { testCaseApi, reviewApi } from '@/api/modules/testcase'
 import { exportToExcel, exportToCSV } from '@/utils/export'
 
@@ -424,365 +456,105 @@ const props = defineProps({
   }
 })
 
+const projectId = computed(() => props.project?.id)
 const router = useRouter()
 const route = useRoute()
 
-const sidebarCollapsed = ref(false)
-const batchMode = ref(false)
+const testCases = useTestCases()
+
+const {
+  moduleTree,
+  selectedRepo,
+  selectedVersion,
+  repoList,
+  versionList,
+  defaultVersionId,
+  repoVersionLoading,
+  moduleTreeData,
+  moduleLoading,
+  selectedModule,
+  sidebarCollapsed,
+  handleCreateRepo,
+  handleCreateVersion,
+  handleManageRepo,
+  handleManageVersion,
+  handleAddModule,
+  handleAddSubModule,
+  handleEditModule,
+  handleDeleteModule,
+  handleModuleClick,
+  handleShowAll,
+  handleModuleRefresh
+} = useRepoVersionModuleTree({
+  projectId,
+  onVersionChange: (versionId) => {
+    currentPage.value = 1
+    searchQuery.value = ''
+    filterPriority.value = ''
+    filterStatus.value = ''
+    testCases.fetchTestCasesByVersion(versionId, { page: 1, page_size: pageSize.value })
+  },
+  onModuleChange: (moduleId) => {
+    currentPage.value = 1
+    if (moduleId) {
+      testCases.fetchTestCasesByModule(moduleId, { page: 1, page_size: pageSize.value })
+    } else if (selectedVersion.value) {
+      testCases.fetchTestCasesByVersion(selectedVersion.value, { page: 1, page_size: pageSize.value })
+    }
+  },
+  onModuleDelete: () => {
+    currentPage.value = 1
+    if (selectedVersion.value) {
+      testCases.fetchTestCasesByVersion(selectedVersion.value, { page: 1, page_size: pageSize.value })
+    }
+  }
+})
+
 const searchQuery = ref('')
 const filterStatus = ref('')
 const filterPriority = ref('')
 const currentPage = ref(1)
 const pageSize = ref(20)
-const selectedCases = ref([])
-const selectedModule = ref(null)
 const tableRef = ref(null)
 
 const dialogVisible = ref(false)
 const isEditing = ref(false)
 const editingCaseId = ref(null)
 
-// 评审相关
-const reviewVisible = ref(false)
-const rejectVisible = ref(false)
+// 被驳回用例编辑保存后「提交重审」相关状态
+const pendingResubmitCaseId = ref(null)
 const resubmitVisible = ref(false)
-const reviewSubmitting = ref(false)
-const reviewCase = ref(null)
-const rejectReason = ref('')
 const resubmitNote = ref('')
-const reviewComments = ref([])
-const pendingResubmitCaseId = ref(null) // 待重新提交的用例ID
+const resubmitSubmitting = ref(false)
 
-// 评审对话框编辑模式
-const reviewEditMode = ref(false)
-const reviewEditForm = reactive({
-  title: '',
-  module: null,
-  priority: 'p2',
-  precondition: '',
-  steps: '',
-  expected_result: '',
-  requirement: '',
-  revision_note: ''
-})
-
-// AI 生成相关
 const aiGenerateVisible = ref(false)
+const exporting = ref(false)
 
-const PRIORITY_TEXT = { p0: 'P0', p1: 'P1', p2: 'P2', p3: 'P3' }
-const getPriorityText = (p) => PRIORITY_TEXT[p] || 'P2'
-const formatReviewDate = (str) => {
-  if (!str) return ''
-  const d = new Date(str)
-  return `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()} ${d.getHours()}:${String(d.getMinutes()).padStart(2, '0')}`
-}
-
-const repoVersion = useRepositoryAndVersion()
-const moduleTree = useModuleTree()
-const testCases = useTestCases()
+// Web 自动化执行弹窗
+const webExecuteVisible = ref(false)
+const webExecuteCases = ref([])
 
 const form = reactive({ ...DEFAULT_TEST_CASE_FORM })
 
-const repoList = computed(() => {
-  return repoVersion.repositories.value.map(repo => ({
-    id: repo.id,
-    name: repo.name,
-    icon: repo.is_default ? 'Folder' : 'Collection'
-  }))
-})
-
-const versionList = computed(() => {
-  return repoVersion.versions.value.map(v => ({
-    id: v.id,
-    name: v.name,
-    is_default: v.is_default
-  }))
-})
-
-// 获取默认版本ID
-const defaultVersionId = computed(() => {
-  const defaultVersion = versionList.value.find(v => v.is_default)
-  return defaultVersion?.id || null
-})
-
-const moduleTreeData = computed(() => {
-  return moduleTree.modules.value
-})
-
-const selectedRepo = computed({
-  get: () => repoVersion.selectedRepo.value,
-  set: (val) => { repoVersion.selectedRepo.value = val }
-})
-
-const selectedVersion = computed({
-  get: () => repoVersion.selectedVersion.value,
-  set: (val) => { repoVersion.selectedVersion.value = val }
-})
-
-const repoVersionLoading = computed(() => repoVersion.loading.value)
-const moduleLoading = computed(() => moduleTree.loading.value)
 const testCaseLoading = computed(() => testCases.loading.value)
 const total = computed(() => testCases.total.value)
 
-// 导出相关状态
-const exporting = ref(false)
-
-// 是否处于过滤状态
 const isFiltering = computed(() => {
   return searchQuery.value.trim() || filterStatus.value || filterPriority.value
 })
 
-const fetchRepositories = async () => {
-  try {
-    await repoVersion.fetchRepositories(props.project?.id)
-  } catch (err) {
-    ElMessage.error(err.message || '获取用例库失败')
-  }
-}
-
-const fetchVersions = async (repoId) => {
-  if (!repoId) return
-  try {
-    await repoVersion.fetchVersions(repoId)
-  } catch (err) {
-    ElMessage.error(err.message || '获取版本列表失败')
-  }
-}
-
-const handleCreateRepo = async () => {
-  try {
-    const { value } = await ElMessageBox.prompt('请输入用例库名称', '新建用例库', {
-      confirmButtonText: '确定',
-      cancelButtonText: '取消',
-      inputValidator: (val) => {
-        if (!val || val.trim() === '') {
-          return '用例库名称不能为空'
-        }
-        return true
-      }
-    })
-
-    await repoVersion.createRepository({
-      name: value.trim(),
-      project: props.project?.id,
-      is_default: repoVersion.repositories.value.length === 0
-    })
-    ElMessage.success('用例库创建成功')
-  } catch (err) {
-    if (err !== 'cancel') {
-      ElMessage.error(err.message || '创建用例库失败')
-    }
-  }
-}
-
-const handleCreateVersion = async () => {
-  if (!repoVersion.selectedRepo.value) {
-    ElMessage.warning('请先选择用例库')
-    return
-  }
-
-  try {
-    const { value } = await ElMessageBox.prompt('请输入版本名称', '新建版本', {
-      confirmButtonText: '确定',
-      cancelButtonText: '取消',
-      inputValidator: (val) => {
-        if (!val || val.trim() === '') {
-          return '版本名称不能为空'
-        }
-        return true
-      }
-    })
-
-    await repoVersion.createVersion({
-      name: value.trim(),
-      repository: repoVersion.selectedRepo.value,
-      is_default: repoVersion.versions.value.length === 0
-    })
-    ElMessage.success('版本创建成功')
-  } catch (err) {
-    if (err !== 'cancel') {
-      ElMessage.error(err.message || '创建版本失败')
-    }
-  }
-}
-
-const handleManageRepo = () => {
-  const projectCode = route.params.code
-  router.push({
-    path: `/p/${projectCode}/t/manage-repo`
-  })
-}
-
-const handleManageVersion = () => {
-  if (!repoVersion.selectedRepo.value) {
-    ElMessage.warning('请先选择用例库')
-    return
-  }
-  const projectCode = route.params.code
-  router.push({
-    path: `/p/${projectCode}/t/manage-version`,
-    query: {
-      repo: repoVersion.selectedRepo.value,
-      name: repoList.value.find(r => r.id === repoVersion.selectedRepo.value)?.name || ''
-    }
-  })
-}
-
-const handleAddModule = async () => {
-  if (!repoVersion.selectedVersion.value) {
-    ElMessage.warning('请先选择版本')
-    return
-  }
-
-  try {
-    const { value } = await ElMessageBox.prompt('请输入模块名称', '添加模块', {
-      confirmButtonText: '确定',
-      cancelButtonText: '取消',
-      inputValidator: (val) => {
-        if (!val || val.trim() === '') {
-          return '模块名称不能为空'
-        }
-        return true
-      }
-    })
-
-    await moduleTree.createModule({
-      name: value.trim(),
-      version: Number(repoVersion.selectedVersion.value),
-      parent: selectedModule.value ? Number(selectedModule.value) : null
-    })
-    ElMessage.success('模块添加成功')
-  } catch (err) {
-    if (err !== 'cancel') {
-      ElMessage.error(err.message || '添加模块失败')
-    }
-  }
-}
-
-const handleAddSubModule = async (parentModule) => {
-  if (!repoVersion.selectedVersion.value) {
-    ElMessage.warning('请先选择版本')
-    return
-  }
-
-  try {
-    const { value } = await ElMessageBox.prompt(`请在 "${parentModule.name}" 下添加子模块`, '添加子模块', {
-      confirmButtonText: '确定',
-      cancelButtonText: '取消',
-      inputValidator: (val) => {
-        if (!val || val.trim() === '') {
-          return '模块名称不能为空'
-        }
-        return true
-      }
-    })
-
-    await moduleTree.createModule({
-      name: value.trim(),
-      version: Number(repoVersion.selectedVersion.value),
-      parent: parentModule.id
-    })
-    ElMessage.success('子模块添加成功')
-  } catch (err) {
-    if (err !== 'cancel') {
-      ElMessage.error(err.message || '添加子模块失败')
-    }
-  }
-}
-
-const handleEditModule = async (module) => {
-  try {
-    const { value } = await ElMessageBox.prompt('修改模块名称', '编辑模块', {
-      confirmButtonText: '确定',
-      cancelButtonText: '取消',
-      inputValue: module.name,
-      inputValidator: (val) => {
-        if (!val || val.trim() === '') {
-          return '模块名称不能为空'
-        }
-        return true
-      }
-    })
-
-    await moduleTree.updateModule(module.id, {
-      name: value.trim()
-    })
-    ElMessage.success('模块更新成功')
-  } catch (err) {
-    if (err !== 'cancel') {
-      ElMessage.error(err.message || '更新模块失败')
-    }
-  }
-}
-
-const handleDeleteModule = async (module) => {
-  const hasChildren = module.children && module.children.length > 0
-  const hasCases = module.count && module.count > 0
-
-  let confirmMessage = `确定要删除模块 "${module.name}" 吗？`
-  if (hasChildren && hasCases) {
-    confirmMessage = `模块 "${module.name}" 下有 ${module.children.length} 个子模块和 ${module.count} 个用例，删除后子模块和用例将一并删除，确定要删除吗？`
-  } else if (hasChildren) {
-    confirmMessage = `模块 "${module.name}" 下有 ${module.children.length} 个子模块，删除后子模块将一并删除，确定要删除吗？`
-  } else if (hasCases) {
-    confirmMessage = `模块 "${module.name}" 下有 ${module.count} 个用例，删除后用例将一并删除，确定要删除吗？`
-  }
-
-  try {
-    await ElMessageBox.confirm(confirmMessage, '删除模块', {
-      confirmButtonText: '确定',
-      cancelButtonText: '取消',
-      type: 'warning'
-    })
-
-    await moduleTree.deleteModule(module.id, repoVersion.selectedVersion.value)
-    ElMessage.success('模块删除成功')
-
-    if (selectedModule.value === module.id) {
-      selectedModule.value = null
-      currentPage.value = 1
-      await testCases.fetchTestCasesByVersion(repoVersion.selectedVersion.value, { page: 1, page_size: pageSize.value })
-    }
-  } catch (err) {
-    if (err !== 'cancel') {
-      ElMessage.error(err.message || '删除模块失败')
-    }
-  }
-}
-
-const handleModuleClick = (data) => {
-  selectedModule.value = data.id
-  currentPage.value = 1
-  testCases.fetchTestCasesByModule(data.id, { page: 1, page_size: pageSize.value })
-}
-
-const handleShowAllCases = () => {
-  selectedModule.value = null
-  currentPage.value = 1
-  if (repoVersion.selectedVersion.value) {
-    testCases.fetchTestCasesByVersion(repoVersion.selectedVersion.value, { page: 1, page_size: pageSize.value })
-  }
-}
-
-const handleModuleRefresh = async () => {
-  if (repoVersion.selectedVersion.value) {
-    await moduleTree.fetchModuleTree(repoVersion.selectedVersion.value)
-    await testCases.fetchTestCasesByVersion(repoVersion.selectedVersion.value, { page: currentPage.value, page_size: pageSize.value })
-  }
-}
+const PRIORITY_TEXT = { p0: 'P0', p1: 'P1', p2: 'P2', p3: 'P3' }
+const getPriorityText = (p) => PRIORITY_TEXT[p] || 'P2'
 
 const handleCreateTestCase = () => {
   isEditing.value = false
   editingCaseId.value = null
+  pendingResubmitCaseId.value = null
   Object.assign(form, {
     ...DEFAULT_TEST_CASE_FORM,
     module: selectedModule.value || null
   })
   dialogVisible.value = true
-}
-
-const handleSelectionChange = (selection) => {
-  selectedCases.value = selection
 }
 
 const handleCommand = ({ command, row }) => {
@@ -795,11 +567,17 @@ const handleCommand = ({ command, row }) => {
   handlers[command]?.(row)
 }
 
-const handleExecuteCase = (row) => ElMessage.success(`开始执行用例: ${row.name || row.title}`)
+const handleExecuteCase = (row) => {
+  // 点击功能用例表格的「执行」按钮：调用 Web 自动化微服务
+  webExecuteCases.value = [row]
+  webExecuteVisible.value = true
+}
 
 const handleEditCase = async (row) => {
   isEditing.value = true
   editingCaseId.value = row.id
+  // 标记：若编辑的是被驳回用例，保存后弹出「提交重审」对话框
+  pendingResubmitCaseId.value = row.review_status === 'rejected' ? row.id : null
 
   try {
     const response = await testCases.getTestCase(row.id)
@@ -807,7 +585,7 @@ const handleEditCase = async (row) => {
     Object.assign(form, {
       title: caseDetail.title || '',
       module: caseDetail.module,
-      version: caseDetail.version || repoVersion.selectedVersion.value,
+      version: caseDetail.version || selectedVersion.value,
       precondition: caseDetail.precondition || '',
       steps: caseDetail.steps || '',
       expected_result: caseDetail.expected_result || '',
@@ -849,136 +627,6 @@ const handleDeleteCase = async (row) => {
   }
 }
 
-// 评审相关方法
-const handleReview = async (row) => {
-  try {
-    const res = await testCaseApi.getTestCase(row.id)
-    reviewCase.value = res || row
-    // 获取评审历史
-    try {
-      const reviewRes = await reviewApi.getReviewHistory(row.id)
-      reviewComments.value = reviewRes || []
-    } catch {
-      reviewComments.value = []
-    }
-    reviewVisible.value = true
-  } catch (err) {
-    ElMessage.error(err.message || '获取用例详情失败')
-  }
-}
-
-const handleApprove = async () => {
-  reviewSubmitting.value = true
-  try {
-    await reviewApi.approveReview(reviewCase.value.id, '评审通过')
-    ElMessage.success('评审通过')
-    reviewVisible.value = false
-    await refreshTestCases()
-  } catch (err) {
-    ElMessage.error(err.message || '操作失败')
-  } finally {
-    reviewSubmitting.value = false
-  }
-}
-
-const showRejectDialog = () => {
-  rejectReason.value = ''
-  rejectVisible.value = true
-}
-
-const confirmReject = async () => {
-  if (!rejectReason.value.trim()) {
-    ElMessage.warning('请输入驳回原因')
-    return
-  }
-  reviewSubmitting.value = true
-  try {
-    await reviewApi.rejectReview(reviewCase.value.id, rejectReason.value)
-    ElMessage.success('已驳回')
-    rejectVisible.value = false
-    reviewVisible.value = false
-    await refreshTestCases()
-  } catch (err) {
-    ElMessage.error(err.message || '操作失败')
-  } finally {
-    reviewSubmitting.value = false
-  }
-}
-
-// 处理编辑用例（从评审面板触发）
-const handleEditFromReview = (caseData) => {
-  isEditing.value = true
-  editingCaseId.value = caseData.id
-  form.value = { ...DEFAULT_TEST_CASE_FORM, ...caseData }
-  dialogVisible.value = true
-}
-
-// 进入评审对话框的编辑模式
-const enterReviewEditMode = () => {
-  if (!reviewCase.value) return
-
-  reviewEditMode.value = true
-  // 将当前用例内容填充到编辑表单
-  reviewEditForm.title = reviewCase.value.title || ''
-  reviewEditForm.module = reviewCase.value.module || null
-  reviewEditForm.priority = reviewCase.value.priority || 'p2'
-  reviewEditForm.precondition = reviewCase.value.precondition || ''
-  reviewEditForm.steps = reviewCase.value.steps || ''
-  reviewEditForm.expected_result = reviewCase.value.expected_result || ''
-  reviewEditForm.requirement = reviewCase.value.requirement || ''
-  reviewEditForm.revision_note = ''
-}
-
-// 取消编辑模式
-const cancelReviewEdit = () => {
-  reviewEditMode.value = false
-}
-
-// 保存编辑并重新提交评审
-const saveAndResubmit = async () => {
-  if (!reviewEditForm.title.trim()) {
-    ElMessage.warning('请填写用例标题')
-    return
-  }
-  if (!reviewEditForm.steps.trim()) {
-    ElMessage.warning('请填写测试步骤')
-    return
-  }
-
-  reviewSubmitting.value = true
-  try {
-    // 1. 更新用例内容
-    const updateData = {
-      title: reviewEditForm.title,
-      module: reviewEditForm.module,
-      version: reviewCase.value.version, // 必须传递 version
-      priority: reviewEditForm.priority,
-      precondition: reviewEditForm.precondition,
-      steps: reviewEditForm.steps,
-      expected_result: reviewEditForm.expected_result,
-      requirement: reviewEditForm.requirement
-    }
-    await testCaseApi.updateTestCase(reviewCase.value.id, updateData)
-
-    // 2. 重新提交评审
-    await reviewApi.resubmitReview(reviewCase.value.id, reviewEditForm.revision_note)
-
-    ElMessage.success('已保存并重新提交评审')
-    reviewVisible.value = false
-    reviewEditMode.value = false
-    await refreshTestCases()
-  } catch (err) {
-    ElMessage.error(err.message || '操作失败')
-  } finally {
-    reviewSubmitting.value = false
-  }
-}
-
-// 评审对话框关闭时重置编辑模式
-const handleReviewDialogClose = () => {
-  reviewEditMode.value = false
-}
-
 // AI 生成相关方法
 const handleOpenAIGenerate = () => {
   if (!selectedVersion.value) {
@@ -992,7 +640,6 @@ const handleAIGenerated = async (result) => {
   if (result.created_count > 0) {
     ElMessage.success(`成功生成 ${result.created_count} 条测试用例`)
     await refreshTestCases()
-    // 刷新模块树
     if (selectedVersion.value) {
       await moduleTree.fetchModuleTree(selectedVersion.value)
     }
@@ -1004,94 +651,6 @@ const handleGoToKnowledge = () => {
   router.push({
     path: `/p/${projectCode}/knowledge`
   })
-}
-
-const handleBatchExecute = () => {
-  if (selectedCases.value.length === 0) {
-    ElMessage.warning('请先选择要执行的用例')
-    return false
-  }
-  ElMessage.success(`批量执行 ${selectedCases.value.length} 个用例`)
-  return true
-}
-
-const handleBatchMove = () => {
-  if (selectedCases.value.length === 0) {
-    ElMessage.warning('请先选择要移动的用例')
-    return false
-  }
-  ElMessage.info('批量移动功能开发中')
-  return false
-}
-
-const handleBatchCopy = async () => {
-  if (selectedCases.value.length === 0) {
-    ElMessage.warning('请先选择要复制的用例')
-    return false
-  }
-  try {
-    const ids = selectedCases.value.map(c => c.id)
-    const response = await testCases.batchCopy?.(ids)
-    const copiedCount = response?.data?.copied_count || selectedCases.value.length
-    ElMessage.success(`成功复制 ${copiedCount} 个用例`)
-    await refreshTestCases()
-    return true
-  } catch (err) {
-    ElMessage.error(err.message || '批量复制失败')
-    return false
-  }
-}
-
-const handleBatchDelete = async () => {
-  if (selectedCases.value.length === 0) {
-    ElMessage.warning('请先选择要删除的用例')
-    return false
-  }
-  try {
-    await ElMessageBox.confirm(`确定要删除选中的 ${selectedCases.value.length} 个用例吗？`, '警告', {
-      type: 'warning'
-    })
-    const ids = selectedCases.value.map(c => c.id)
-    const response = await testCases.batchDelete?.(ids)
-    const deletedCount = response?.data?.deleted_count || selectedCases.value.length
-    ElMessage.success(`成功删除 ${deletedCount} 个用例`)
-    await refreshTestCases()
-    return true
-  } catch (err) {
-    if (err !== 'cancel') {
-      ElMessage.error(err.message || '批量删除失败')
-    }
-    return false
-  }
-}
-
-const toggleBatchMode = () => {
-  batchMode.value = !batchMode.value
-  if (!batchMode.value) {
-    selectedCases.value = []
-    tableRef.value?.clearSelection()
-  }
-}
-
-const handleBatchAction = async (action) => {
-  if (selectedCases.value.length === 0) {
-    ElMessage.warning('请先选择用例后再进行批量操作')
-    return
-  }
-
-  const handlers = {
-    execute: handleBatchExecute,
-    move: handleBatchMove,
-    copy: handleBatchCopy,
-    delete: handleBatchDelete
-  }
-
-  const success = await handlers[action]?.()
-  if (success) {
-    batchMode.value = false
-    selectedCases.value = []
-    tableRef.value?.clearSelection()
-  }
 }
 
 const handleFormUpdate = (updatedForm) => {
@@ -1113,7 +672,7 @@ const handleSubmit = async (continueCreate = false) => {
     const data = {
       title: form.title,
       module: form.module,
-      version: repoVersion.selectedVersion.value,
+      version: selectedVersion.value,
       priority: form.priority,
       automation_status: form.automation_status,
       estimated_hours: form.estimated_hours,
@@ -1133,6 +692,7 @@ const handleSubmit = async (continueCreate = false) => {
       // 如果是被驳回的用例，编辑保存后弹出重新提交对话框
       if (pendingResubmitCaseId.value === editingCaseId.value) {
         await refreshTestCases()
+        resubmitNote.value = ''
         resubmitVisible.value = true
       }
     } else {
@@ -1155,14 +715,28 @@ const resetForm = () => {
   Object.assign(form, { ...DEFAULT_TEST_CASE_FORM })
 }
 
+// 被驳回用例编辑保存后，在重提对话框中确认「提交重审」
+const confirmResubmit = async () => {
+  resubmitSubmitting.value = true
+  try {
+    await reviewApi.resubmitReview(editingCaseId.value, resubmitNote.value)
+    ElMessage.success('已提交重审')
+    resubmitVisible.value = false
+    resubmitNote.value = ''
+    pendingResubmitCaseId.value = null
+    await refreshTestCases()
+  } catch (err) {
+    ElMessage.error(err.message || '提交重审失败')
+  } finally {
+    resubmitSubmitting.value = false
+  }
+}
+
 const handlePageChange = (page, size) => {
   currentPage.value = page
   pageSize.value = size
   loadTestCases()
 }
-
-// 搜索防抖定时器
-let searchDebounceTimer = null
 
 const loadTestCases = async () => {
   const params = { page: currentPage.value, page_size: pageSize.value }
@@ -1184,14 +758,36 @@ const loadTestCases = async () => {
 
   if (selectedModule.value) {
     await testCases.fetchTestCasesByModule(selectedModule.value, params)
-  } else if (repoVersion.selectedVersion.value) {
-    await testCases.fetchTestCasesByVersion(repoVersion.selectedVersion.value, params)
+  } else if (selectedVersion.value) {
+    await testCases.fetchTestCasesByVersion(selectedVersion.value, params)
   }
 }
 
 const refreshTestCases = async () => {
   await loadTestCases()
 }
+
+// ---- 批量操作（Composable，必须在 refreshTestCases 之后） ----
+const {
+  batchMode, selectedCases,
+  handleSelectionChange,
+  handleBatchExecute, handleBatchMove, handleBatchCopy, handleBatchDelete,
+  toggleBatchMode, handleBatchAction
+} = useBatchOperation(refreshTestCases, testCases, {
+  onExecute: (cases) => {
+    webExecuteCases.value = cases
+    webExecuteVisible.value = true
+  }
+})
+
+// ---- 评审流程（Composable，必须在 refreshTestCases 之后） ----
+const {
+  reviewVisible, rejectVisible, reviewSubmitting, reviewCase,
+  rejectReason, reviewComments, reviewEditMode, reviewEditForm,
+  formatReviewDate,
+  handleReview, handleApprove, showRejectDialog, confirmReject,
+  enterReviewEditMode, cancelReviewEdit, saveAndResubmit, handleReviewDialogClose
+} = useTestCaseReview(refreshTestCases)
 
 // 导出功能
 const handleExport = async (format) => {
@@ -1219,7 +815,7 @@ const handleExport = async (format) => {
     }
 
     // 获取版本名称用于文件名
-    const versionInfo = repoVersion.versions.value.find(v => v.id === selectedVersion.value)
+    const versionInfo = versionList.value.find(v => v.id === selectedVersion.value)
     const versionName = versionInfo?.name || '测试用例'
     const filename = `${versionName}_${new Date().toISOString().slice(0, 10)}`
 
@@ -1238,54 +834,15 @@ const handleExport = async (format) => {
 }
 
 // 监听搜索条件变化，触发后端搜索（带防抖）
-watch([searchQuery, filterPriority, filterStatus], () => {
-  // 清除之前的定时器
-  if (searchDebounceTimer) {
-    clearTimeout(searchDebounceTimer)
-  }
+let searchDebounceTimer = null
 
-  // 设置新的防抖定时器（300ms）
+watch([searchQuery, filterPriority, filterStatus], () => {
+  if (searchDebounceTimer) clearTimeout(searchDebounceTimer)
   searchDebounceTimer = setTimeout(() => {
     currentPage.value = 1
     loadTestCases()
   }, 300)
 })
-
-watch(() => repoVersion.selectedRepo.value, async (newRepoId, oldRepoId) => {
-  if (newRepoId && newRepoId !== oldRepoId) {
-    repoVersion.selectedVersion.value = null
-    selectedModule.value = null
-    repoVersion.versions.value = []
-    moduleTree.modules.value = []
-    testCases.testCases.value = []
-    // 清空搜索条件
-    searchQuery.value = ''
-    filterPriority.value = ''
-    filterStatus.value = ''
-    await fetchVersions(newRepoId)
-  }
-})
-
-watch(() => repoVersion.selectedVersion.value, async (newVersionId, oldVersionId) => {
-  if (newVersionId && newVersionId !== oldVersionId) {
-    selectedModule.value = null
-    currentPage.value = 1
-    // 清空搜索条件
-    searchQuery.value = ''
-    filterPriority.value = ''
-    filterStatus.value = ''
-    await Promise.all([
-      moduleTree.fetchModuleTree(newVersionId),
-      testCases.fetchTestCasesByVersion(newVersionId, { page: 1, page_size: pageSize.value })
-    ])
-  }
-})
-
-watch(() => props.project, (newProject) => {
-  if (newProject?.id) {
-    fetchRepositories()
-  }
-}, { immediate: true })
 </script>
 
 <style scoped>

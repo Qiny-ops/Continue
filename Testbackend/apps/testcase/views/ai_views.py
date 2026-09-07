@@ -12,6 +12,7 @@ from django.http import StreamingHttpResponse, JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.db import transaction
 from django.conf import settings
+from apps.core.utils.cors import get_safe_cors_origin
 import json
 import time
 import logging
@@ -223,7 +224,6 @@ def generate_test_cases_batch(request):
                             precondition=precondition,
                             priority=priority,
                             tags=case_data.get("tags", []),
-                            requirement=f"{module_name}: {mapping.get('func_point', '')}",
                             version_id=version_id,
                             module=module,
                             created_by=request.user,
@@ -314,8 +314,6 @@ def generate_test_cases_batch(request):
         )
 
 
-from django.views.decorators.csrf import csrf_exempt
-
 
 def _check_rate_limit(request):
     """
@@ -352,13 +350,10 @@ def generate_test_cases_stream_native(request):
     if not allowed:
         return error_response
 
-    # 获取 Origin
-    origin = request.META.get('HTTP_ORIGIN', 'http://localhost:5174')
-
     # 处理 OPTIONS 预检请求
     if request.method == 'OPTIONS':
         response = JsonResponse({})
-        response['Access-Control-Allow-Origin'] = origin
+        response['Access-Control-Allow-Origin'] = get_safe_cors_origin(request)
         response['Access-Control-Allow-Methods'] = 'POST, OPTIONS'
         response['Access-Control-Allow-Headers'] = 'Content-Type, Authorization'
         response['Access-Control-Allow-Credentials'] = 'true'
@@ -369,7 +364,7 @@ def generate_test_cases_stream_native(request):
     auth_result = auth.authenticate(request)
     if auth_result is None:
         response = JsonResponse({'success': False, 'error': '未认证'}, status=401)
-        response['Access-Control-Allow-Origin'] = origin
+        response['Access-Control-Allow-Origin'] = get_safe_cors_origin(request)
         return response
 
     user, token = auth_result
@@ -380,7 +375,7 @@ def generate_test_cases_stream_native(request):
         body = json.loads(request.body) if request.body else {}
     except json.JSONDecodeError:
         response = JsonResponse({'success': False, 'error': 'Invalid JSON'}, status=400)
-        response['Access-Control-Allow-Origin'] = origin
+        response['Access-Control-Allow-Origin'] = get_safe_cors_origin(request)
         return response
 
     knowledge_base_ids = body.get("knowledge_base_ids", [])
@@ -391,12 +386,12 @@ def generate_test_cases_stream_native(request):
 
     if not knowledge_base_ids:
         response = JsonResponse({'success': False, 'error': 'knowledge_base_ids不能为空'}, status=400)
-        response['Access-Control-Allow-Origin'] = origin
+        response['Access-Control-Allow-Origin'] = get_safe_cors_origin(request)
         return response
 
     if not version_id:
         response = JsonResponse({'success': False, 'error': 'version_id不能为空'}, status=400)
-        response['Access-Control-Allow-Origin'] = origin
+        response['Access-Control-Allow-Origin'] = get_safe_cors_origin(request)
         return response
 
     # 权限验证：检查用户是否有权限访问该版本
@@ -405,7 +400,7 @@ def generate_test_cases_stream_native(request):
         version = TestCaseVersion.objects.filter(id=version_id).select_related('repository').first()
         if not version:
             response = JsonResponse({'success': False, 'error': '版本不存在'}, status=404)
-            response['Access-Control-Allow-Origin'] = origin
+            response['Access-Control-Allow-Origin'] = get_safe_cors_origin(request)
             return response
 
         # 检查用户是否是项目的成员
@@ -413,12 +408,12 @@ def generate_test_cases_stream_native(request):
         project_id = version.repository.project_id
         if not ProjectMember.objects.filter(project_id=project_id, user=user).exists():
             response = JsonResponse({'success': False, 'error': '您没有权限访问该项目'}, status=403)
-            response['Access-Control-Allow-Origin'] = origin
+            response['Access-Control-Allow-Origin'] = get_safe_cors_origin(request)
             return response
     except Exception as e:
         logger.error(f"Permission check failed: {e}")
-        # 权限检查失败不阻止流程，只记录日志
-        pass
+        # 权限校验失败必须 fail-closed，禁止放行
+        return JsonResponse({'success': False, 'error': '权限校验失败'}, status=403)
 
     # 生成唯一的任务ID，用于取消机制
     import uuid
@@ -434,10 +429,20 @@ def generate_test_cases_stream_native(request):
         return cache.get(f"ai_gen_cancel:{task_id}", False)
 
     def generate_stream():
+        # 任务状态变量（在 try 外初始化，供 finally 兜底引用，避免 NameError）
+        total_requests = 0
+        completed_count = 0
+        total_created = 0
+        total_errors = 0
+        all_cases = []
+        result_queue = None
+        total_start_time = None
+
         try:
             from apps.knowledge.services.requirement_service import RequirementService
             from apps.testcase.models import TestCase, TestModule
             from django.core.cache import cache
+            from django.utils import timezone
 
             logger.info(f"Starting stream generation, task_id={task_id}")
 
@@ -714,8 +719,8 @@ def generate_test_cases_stream_native(request):
                 finally:
                     try:
                         req_service.repository.delete_session(session_id)
-                    except:
-                        pass
+                    except Exception:
+                        logger.warning(f"清理会话 {session_id} 失败", exc_info=True)
 
                 # 返回空结果
                 return batch_idx, [
@@ -749,6 +754,7 @@ def generate_test_cases_stream_native(request):
                     if check_cancelled():
                         for f in futures:
                             f.cancel()
+                        update_task(status='cancelled', step_message='用户取消生成', finished_at=timezone.now())
                         yield send_event("cancelled", {"message": "任务已取消"})
                         return
 
@@ -957,7 +963,7 @@ def generate_test_cases_stream_native(request):
                         try:
                             _loop.run_until_complete(_loop.shutdown_asyncgens())
                         except Exception:
-                            pass
+                            logger.debug("事件循环清理异常（可忽略）", exc_info=True)
                         _loop.close()
 
                     if stream_result and stream_result.get("type") == "done":
@@ -1070,7 +1076,6 @@ def generate_test_cases_stream_native(request):
                                     precondition=precondition,
                                     priority=priority,
                                     tags=case_data.get("tags", []),
-                                    requirement=f"{module}: {func_point}",
                                     version_id=version_id,
                                     module=module_obj,
                                     created_by=user,
@@ -1155,6 +1160,7 @@ def generate_test_cases_stream_native(request):
 
                             if result.get('success'):
                                 total_created += result.get('cases_count', 0)
+                                all_cases.extend((result.get('data') or {}).get('cases', []))
                             else:
                                 total_errors += 1
 
@@ -1166,13 +1172,33 @@ def generate_test_cases_stream_native(request):
                     try:
                         future.result(timeout=1)
                     except Exception:
-                        pass
+                        logger.debug("异步任务回收异常（可忽略）", exc_info=True)
                 futures.clear()
 
             total_elapsed = time.time() - total_start_time
             generate_elapsed = time.time() - step_start_time
 
             # 5. 完成
+
+            # 追加：将提取的需求入库保存（不改动现有流程）
+            try:
+                from apps.requirement.services.requirement_service import RequirementService
+                # 从版本获取项目ID
+                _version = TestCaseVersion.objects.filter(id=version_id).select_related('repository').first()
+                _project_id = _version.repository.project_id if _version else None
+                if _project_id:
+                    RequirementService.save_extracted_requirements(
+                        project_id=_project_id,
+                        version_id=version_id,
+                        requirements_data=requirements,
+                        user=user,
+                        knowledge_base_id=knowledge_base_ids[0] if knowledge_base_ids else '',
+                        knowledge_id=knowledge_ids[0] if knowledge_ids else '',
+                        session_id='',
+                    )
+            except Exception as e:
+                logger.warning(f"需求入库失败（不影响生成结果）: {e}")
+
             yield send_event("progress", {
                 "step": "complete",
                 "status": "complete",
@@ -1210,20 +1236,19 @@ def generate_test_cases_stream_native(request):
             yield send_event("error", {
                 "error": str(e),
                 "code": "INTERNAL_ERROR",
-                "traceback": traceback.format_exc() if settings.DEBUG else None
             })
-
     response = StreamingHttpResponse(
         generate_stream(),
         content_type='text/event-stream',
     )
     response['Cache-Control'] = 'no-cache'
     response['X-Accel-Buffering'] = 'no'
-    response['Access-Control-Allow-Origin'] = origin
+    response['Access-Control-Allow-Origin'] = get_safe_cors_origin(request)
     response['Access-Control-Allow-Credentials'] = 'true'
     response['Access-Control-Allow-Headers'] = 'Content-Type, Authorization'
 
     return response
+
 
 
 @extend_schema(tags=['AI生成'])
@@ -1240,7 +1265,7 @@ def generate_test_cases_stream(request):
     # 处理 OPTIONS 预检请求
     if request.method == 'OPTIONS':
         response = Response({})
-        response['Access-Control-Allow-Origin'] = request.META.get('HTTP_ORIGIN', '*')
+        response['Access-Control-Allow-Origin'] = get_safe_cors_origin(request)
         response['Access-Control-Allow-Methods'] = 'POST, OPTIONS'
         response['Access-Control-Allow-Headers'] = 'Content-Type, Authorization'
         response['Access-Control-Allow-Credentials'] = 'true'
@@ -1496,7 +1521,6 @@ def generate_test_cases_stream(request):
                                 precondition=precondition,
                                 priority=priority,
                                 tags=case_data.get("tags", []),
-                                requirement=f"{module_name}: {mapping.get('func_point', '')}",
                                 version_id=version_id,
                                 module=module,
                                 created_by=user,
@@ -1583,7 +1607,7 @@ def generate_test_cases_stream(request):
         headers={
             'Cache-Control': 'no-cache',
             'X-Accel-Buffering': 'no',
-            'Access-Control-Allow-Origin': request.META.get('HTTP_ORIGIN', '*'),
+            'Access-Control-Allow-Origin': get_safe_cors_origin(request),
             'Access-Control-Allow-Credentials': 'true',
             'Access-Control-Allow-Headers': 'Content-Type, Authorization',
         }

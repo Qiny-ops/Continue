@@ -23,6 +23,7 @@ from apps.testcase.models import (
     TestCaseRepository, TestCaseVersion, TestModule,
     TestCase, TestCaseReview, TestCaseExecution
 )
+from apps.requirement.models import Requirement
 
 
 class Command(BaseCommand):
@@ -255,9 +256,50 @@ class Command(BaseCommand):
         self.stdout.write(f'  创建模块: {len(modules)} 个')
         return modules
 
+    def _create_requirements(self, versions, users):
+        """创建需求记录（先于测试用例，用作 FK 关联）"""
+        self.stdout.write('\n[6.5] 创建需求记录...')
+        req_data = [
+            ('REQ-LOGIN-001', 'ecommerce_V3.2', '用户登录功能', '用户通过用户名密码登录系统'),
+            ('REQ-LOGIN-002', 'ecommerce_V3.2', '登录异常处理', '密码错误、账户锁定等异常场景'),
+            ('REQ-LOGIN-003', 'ecommerce_V3.2', '账户安全策略', '连续失败锁定、密码策略'),
+            ('REQ-PROFILE-001', 'ecommerce_V3.2', '个人中心', '用户个人信息查看与下拉菜单'),
+            ('REQ-SEARCH-001', 'ecommerce_V3.2', '商品搜索', '关键词搜索、搜索建议、搜索结果展示'),
+            ('REQ-PRODUCT-001', 'ecommerce_V3.2', '商品详情', '商品信息展示、规格参数、库存信息'),
+            ('REQ-ORDER-001', 'ecommerce_V3.2', '下单流程', '购物车→确认订单→支付完整下单链路'),
+            ('REQ-ORDER-002', 'ecommerce_V3.2', '订单管理', '订单列表查询、筛选、分页'),
+            ('REQ-ATT-001', 'oa-system_V2.0', '打卡功能', '员工每日签到签退'),
+            ('REQ-LEAVE-001', 'oa-system_V2.0', '请假功能', '员工提交请假申请'),
+            ('REQ-APPROVAL-001', 'oa-system_V2.0', '请假审批', '管理员审批请假申请'),
+            ('REQ-APPROVAL-002', 'oa-system_V2.0', '报销审批', '管理员审批报销申请'),
+        ]
+        req_map = {}
+        for title, version_key, func_point, desc in req_data:
+            req, _ = Requirement.objects.get_or_create(
+                title=title,
+                defaults={
+                    'project': versions[version_key].repository.project,
+                    'version': versions[version_key],
+                    'description': desc,
+                    'func_point': func_point,
+                    'priority': 'p2',
+                    'status': 'active',
+                    'source': 'manual',
+                    'created_by': users['admin'],
+                    'updated_by': users['admin'],
+                }
+            )
+            req_map[title] = req
+        self.stdout.write(f'  创建需求: {len(req_map)} 条')
+        return req_map
+
     def _create_test_cases(self, versions, modules, users):
         self.stdout.write('\n[7/8] 创建测试用例...')
         cases = []
+
+        # 先创建依赖的需求记录
+        requirements = self._create_requirements(versions, users)
+
         case_data = [
             {
                 'version_key': 'ecommerce_V3.2',
@@ -480,11 +522,13 @@ class Command(BaseCommand):
             module = modules.get(data.pop('module_key'))
             created_by = users[data.pop('created_by')]
             updated_by = users[data.pop('updated_by')]
+            req_key = data.pop('requirement', None)
             case = TestCase.objects.create(
                 version=version,
                 module=module,
                 created_by=created_by,
                 updated_by=updated_by,
+                requirement=requirements.get(req_key),
                 **data,
             )
             cases.append(case)

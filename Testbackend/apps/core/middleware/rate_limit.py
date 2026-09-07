@@ -16,10 +16,10 @@ class RateLimitMiddleware:
 
     def __init__(self, get_response):
         self.get_response = get_response
-        # 开发环境使用更宽松的限流配置
+        # 开发环境也需合理限流，防止误配 DEBUG=True 时无有效防护
         if settings.DEBUG:
-            self.rate_limit = 1000  # 每分钟最多1000次请求
-            self.auth_rate_limit = 5000  # 认证用户每分钟最多5000次请求
+            self.rate_limit = 200  # 每分钟最多200次请求
+            self.auth_rate_limit = 600  # 认证用户每分钟最多600次请求
         else:
             self.rate_limit = 60  # 每分钟最多60次请求
             self.auth_rate_limit = 300  # 认证用户每分钟最多300次请求

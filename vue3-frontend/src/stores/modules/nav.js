@@ -13,6 +13,7 @@ import { useUserStore } from '@/stores/modules/user'
 // 所有可用的导航项定义
 const allActivityItems = [
   { key: 'project', icon: markRaw(Menu), tooltip: '项目' },
+  { key: 'agent-test', icon: markRaw(Menu), tooltip: 'Agent测试', shortName: 'Agent' },
   { key: 'system', icon: markRaw(Setting), tooltip: '系统管理', roles: ['admin'] }
 ]
 
@@ -47,6 +48,7 @@ export const useNavigationStore = defineStore('navigation', () => {
 
   const routeMap = {
     'project': '/projects',
+    'agent-test': '/agent-test',
     'system': '/system/users',
   }
 
@@ -99,7 +101,9 @@ export const useNavigationStore = defineStore('navigation', () => {
    * @param {string} tooltip - 完整提示文本
    * @returns {string} 简称（前两个字符）
    */
-  const getShortName = (tooltip) => {
+  const getShortName = (item) => {
+    if (typeof item === 'object' && item.shortName) return item.shortName
+    const tooltip = typeof item === 'object' ? item.tooltip : item
     return tooltip.substring(0, 2)
   }
 

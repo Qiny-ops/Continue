@@ -11,6 +11,8 @@
 from django.db import models
 from django.conf import settings
 
+from apps.apitest.fields import EncryptedCharField, EncryptedTextField
+
 
 class ApiEnvironment(models.Model):
     """
@@ -24,6 +26,12 @@ class ApiEnvironment(models.Model):
         ('test', '测试环境'),
         ('staging', '预发布'),
         ('prod', '生产环境'),
+    ]
+
+    # 用途类型：区分该环境面向「接口测试」还是「Web 自动化」
+    TARGET_TYPE_CHOICES = [
+        ('api', '接口测试'),
+        ('web', 'Web 自动化'),
     ]
 
     AUTH_TYPE_CHOICES = [
@@ -48,6 +56,13 @@ class ApiEnvironment(models.Model):
         default='test',
         verbose_name='环境类型'
     )
+    target_type = models.CharField(
+        max_length=10,
+        choices=TARGET_TYPE_CHOICES,
+        default='api',
+        verbose_name='用途类型',
+        help_text='接口测试 / Web 自动化'
+    )
 
     # 核心配置：Base URL
     base_url = models.CharField(
@@ -64,10 +79,10 @@ class ApiEnvironment(models.Model):
         default='none',
         verbose_name='认证类型'
     )
-    auth_token = models.TextField(
+    auth_token = EncryptedTextField(
         blank=True,
         verbose_name='认证Token',
-        help_text='认证令牌，支持变量引用 {{token}}'
+        help_text='认证令牌，支持变量引用 {{token}}（落库加密存储）'
     )
     auth_header = models.CharField(
         max_length=100,
@@ -75,15 +90,15 @@ class ApiEnvironment(models.Model):
         verbose_name='认证请求头',
         help_text='如: Authorization、X-API-Key'
     )
-    auth_username = models.CharField(
-        max_length=100,
+    auth_username = EncryptedCharField(
+        max_length=500,
         blank=True,
-        verbose_name='Basic Auth 用户名'
+        verbose_name='Basic Auth 用户名（落库加密存储）'
     )
-    auth_password = models.CharField(
-        max_length=100,
+    auth_password = EncryptedCharField(
+        max_length=500,
         blank=True,
-        verbose_name='Basic Auth 密码'
+        verbose_name='Basic Auth 密码（落库加密存储）'
     )
 
     # 全局请求头
@@ -121,6 +136,7 @@ class ApiEnvironment(models.Model):
         unique_together = ['project', 'name']
         indexes = [
             models.Index(fields=['project', 'env_type']),
+            models.Index(fields=['project', 'target_type']),
             models.Index(fields=['project', 'is_default']),
         ]
 
@@ -159,6 +175,24 @@ class ApiTestCase(models.Model):
         on_delete=models.CASCADE,
         related_name='api_test_cases',
         verbose_name='所属项目'
+    )
+
+    # 组织关系（可选，纳入版本/模块体系）
+    version = models.ForeignKey(
+        'testcase.TestCaseVersion',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='api_test_cases',
+        verbose_name='所属版本'
+    )
+    module = models.ForeignKey(
+        'testcase.TestModule',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='api_test_cases',
+        verbose_name='所属模块'
     )
 
     # 基本信息（匹配微服务生成格式）
@@ -263,6 +297,25 @@ class ApiTestCase(models.Model):
 
     def __str__(self):
         return self.name
+
+    def save(self, *args, **kwargs):
+        """保证接口用例所属版本与所在模块版本一致，消除跨类型统计口径不一致。
+
+        与手工用例 TestCase 保持同一策略（业务逻辑审计 #10）：当用例归属某个模块时，
+        强制将其 version 同步为模块的 version；仅在 module 已设置时生效，
+        module 为空时保留调用方显式设置的 version，避免覆盖合法的"未归模块"状态。
+        """
+        if self.module_id:
+            try:
+                from apps.testcase.models import TestModule
+                module = TestModule.objects.get(id=self.module_id)
+                if module.version_id and (
+                    not self.version_id or self.version_id != module.version_id
+                ):
+                    self.version = module.version
+            except TestModule.DoesNotExist:
+                pass
+        super().save(*args, **kwargs)
 
 
 class ApiTestRun(models.Model):

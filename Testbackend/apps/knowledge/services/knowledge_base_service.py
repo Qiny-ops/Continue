@@ -74,10 +74,44 @@ class KnowledgeBaseService:
     def delete_knowledge_base(kb_id: str) -> Dict[str, Any]:
         """删除知识库"""
         try:
-            return weknora_repository.delete_knowledge_base(kb_id)
+            result = weknora_repository.delete_knowledge_base(kb_id)
+            # 远端删除成功后，清理本地对远端知识库的悬空引用，
+            # 否则后续调用 WeKnora API 会因 KB 不存在而 404
+            if result.get('success'):
+                KnowledgeBaseService._cleanup_kb_references(kb_id)
+            return result
         except Exception as e:
             logger.error(f'删除知识库失败: {str(e)}', exc_info=True)
             return {'success': False, 'error': str(e)}
+
+    @staticmethod
+    def _cleanup_kb_references(kb_id: str) -> None:
+        """删除知识库后级联清理本地引用（SET_NULL），避免悬空引用。
+
+        涉及：Project / ApiTestCase / Requirement 的 knowledge_base_id，
+        以及 AIGenerationRecord 中 knowledge_base_ids 数组内的该 kb_id。
+        """
+        from apps.projects.models import Project
+        from apps.apitest.models import ApiTestCase
+        from apps.requirement.models import Requirement
+        from apps.testcase.models import AIGenerationRecord
+
+        Project.objects.filter(knowledge_base_id=kb_id).update(
+            knowledge_base_id=None
+        )
+        ApiTestCase.objects.filter(knowledge_base_id=kb_id).update(
+            knowledge_base_id=''
+        )
+        Requirement.objects.filter(knowledge_base_id=kb_id).update(
+            knowledge_base_id='', knowledge_id=''
+        )
+        for record in AIGenerationRecord.objects.filter(
+            knowledge_base_ids__contains=[kb_id]
+        ):
+            record.knowledge_base_ids = [
+                x for x in (record.knowledge_base_ids or []) if x != kb_id
+            ]
+            record.save(update_fields=['knowledge_base_ids'])
 
     @staticmethod
     def copy_knowledge_base(source_id: str, name: Optional[str] = None) -> Dict[str, Any]:

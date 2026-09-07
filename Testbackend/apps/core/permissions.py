@@ -7,9 +7,25 @@
 
 import logging
 
+from rest_framework.permissions import BasePermission
+
 from apps.projects.models import Project, ProjectMember
 
 logger = logging.getLogger(__name__)
+
+
+class IsInternalServiceOrAuthenticated(BasePermission):
+    """允许已认证用户，或携带有效内部服务 API Key 的请求。
+
+    用于微服务之间互相调用的端点（如清理测试账号），关闭「匿名即可访问」
+    的漏洞，同时保留内部服务用 X-Internal-API-Key 调用的能力。
+    """
+
+    def has_permission(self, request, view):
+        if bool(request.user and request.user.is_authenticated):
+            return True
+        # InternalServiceAuthentication 校验成功时 request.auth == 'internal'
+        return request.auth == 'internal'
 
 
 # ==================== 系统权限 ====================
