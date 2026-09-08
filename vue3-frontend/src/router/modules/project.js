@@ -82,6 +82,29 @@ export default [
       },
 
       {
+        path: 'codecheck',
+        name: ROUTE_NAMES.PROJECT_CODECHECK,
+        component: () => import('@/views/codecheck/Index.vue'),
+        meta: {
+          title: '代码检查',
+          requiresAuth: true,
+          keepAlive: false
+        }
+      },
+
+      {
+        path: 'codecheck/:id',
+        name: ROUTE_NAMES.PROJECT_CODECHECK_DETAIL,
+        component: () => import('@/views/codecheck/Detail.vue'),
+        props: true,
+        meta: {
+          title: '代码检查详情',
+          requiresAuth: true,
+          keepAlive: false
+        }
+      },
+
+      {
         path: 'requirements',
         name: ROUTE_NAMES.PROJECT_REQUIREMENTS,
         component: () => import('@/views/requirements/Index.vue'),

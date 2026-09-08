@@ -66,6 +66,9 @@ urlpatterns = [
 
     # 需求管理接口
     path("api/requirements/", include("apps.requirement.urls")),
+
+    # 代码变更检查接口
+    path("api/codecheck/", include("apps.codecheck.urls")),
 ]
 
 # ==================== 开发环境配置 ====================

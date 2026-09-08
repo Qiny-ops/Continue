@@ -67,6 +67,7 @@ INSTALLED_APPS = [
     "apps.apitest",
     "apps.webauto",
     "apps.requirement",
+    "apps.codecheck",
 ]
 
 MIDDLEWARE = [
@@ -276,6 +277,14 @@ WEB_AUTOMATION_SERVICE_URL = os.environ.get('WEB_AUTOMATION_SERVICE_URL', 'http:
 WEB_AUTOMATION_SERVICE_TIMEOUT = int(os.environ.get('WEB_AUTOMATION_SERVICE_TIMEOUT', 180))
 # 调用 web-automation-service 时携带的 API Key（需与微服务侧 API_KEY 配置一致；为空=开发模式不强制）
 WEB_AUTOMATION_API_KEY = os.environ.get('WEB_AUTOMATION_API_KEY', '')
+
+# AI Code Check Service Configuration (代码检查微服务)
+AICHECK_SERVICE_URL = os.environ.get('AICHECK_SERVICE_URL', 'http://localhost:8004')
+AICHECK_SERVICE_TIMEOUT = int(os.environ.get('AICHECK_SERVICE_TIMEOUT', 300))
+# Django 调用 aicheck-service 时携带的 API Key（需与微服务侧 API_KEY 一致；空=开发模式不强制）
+AICHECK_API_KEY = os.environ.get('AICHECK_API_KEY', '')
+# 微服务 Webhook 触发时回调 Django 内部用例接口的 Key（需与微服务侧 INTERNAL_API_KEY 一致）
+AICHECK_INTERNAL_API_KEY = os.environ.get('AICHECK_INTERNAL_API_KEY', '')
 
 # OpenAI Embedding Configuration (用于用例去重)
 OPENAI_API_KEY = os.environ.get('OPENAI_API_KEY', '')

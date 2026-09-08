@@ -1,0 +1,24 @@
+# AI Code Check Service 依赖（FastAPI，对齐平台微服务规范）
+
+# Web 框架
+fastapi>=0.100.0,<1.0.0
+uvicorn[standard]>=0.23.0,<1.0.0
+
+# 数据验证
+pydantic>=2.0.0,<3.0.0
+pydantic-settings>=2.0.0,<3.0.0
+
+# HTTP 客户端
+httpx>=0.24.0,<1.0.0
+
+# Excel 解析
+openpyxl>=3.1.0,<4.0.0
+
+# 重试
+tenacity>=8.2.0,<9.0.0
+
+# 异步支持
+anyio>=4.0.0,<5.0.0
+
+# Claude Agent SDK（保留模型主动读仓库能力）
+claude-agent-sdk>=0.1.0

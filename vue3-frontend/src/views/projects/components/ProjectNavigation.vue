@@ -54,7 +54,8 @@ import {
   Collection,
   Monitor,
   Document,
-  Cpu
+  Cpu,
+  Aim
 } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { PROJECT_ROUTE_PREFIX } from '@/router/constants'
@@ -83,7 +84,8 @@ const NAV_ITEMS = [
   { key: 'requirements', label: '需求管理', icon: Document },
   { key: 'apitest', label: '接口测试', icon: Monitor },
   { key: 'environments', label: '环境管理', icon: Cpu },
-  { key: 'knowledge', label: '知识库', icon: Collection }
+  { key: 'knowledge', label: '知识库', icon: Collection },
+  { key: 'codecheck', label: '代码检查', icon: Aim }
 ]
 
 const ROUTE_MAP = {
@@ -93,6 +95,7 @@ const ROUTE_MAP = {
   apitest: '/apitest',
   environments: '/environments',
   knowledge: '/knowledge',
+  codecheck: '/codecheck',
   settings: '/settings'
 }
 

@@ -88,6 +88,7 @@ const TAB_TO_ROUTE = {
   apitest: '/apitest',
   environments: '/environments',
   knowledge: '/knowledge',
+  codecheck: '/codecheck',
   settings: '/settings'
 }
 
@@ -102,6 +103,8 @@ const COMPONENT_MAP = {
   apitest: defineAsyncComponent(() => import('@/views/apitest/Index.vue')),
   'environments': defineAsyncComponent(() => import('@/views/apitest/Environment.vue')),
   knowledge: defineAsyncComponent(() => import('@/views/knowledge/Index.vue')),
+  codecheck: defineAsyncComponent(() => import('@/views/codecheck/Index.vue')),
+  'codecheck-detail': defineAsyncComponent(() => import('@/views/codecheck/Detail.vue')),
   settings: defineAsyncComponent(() => import('./Settings.vue')),
   'manage-repo': defineAsyncComponent(() => import('@/views/testcase/ManageRepo.vue')),
   'manage-version': defineAsyncComponent(() => import('@/views/testcase/ManageVersion.vue'))
@@ -125,6 +128,12 @@ const setActiveTabFromRoute = () => {
   } else if (path.includes('/apitest')) {
     // 接口测试路由
     activeTab.value = 'apitest'
+  } else if (path.match(/^\/p\/[^/]+\/codecheck\/[^/]+/)) {
+    // 代码检查详情（/p/:code/codecheck/:id）
+    activeTab.value = 'codecheck-detail'
+  } else if (path.includes('/codecheck')) {
+    // 代码检查列表
+    activeTab.value = 'codecheck'
   } else {
     // 匹配 /p/:code/xxx 格式
     const match = path.match(/^\/p\/[^/]+(\/[^/]*)?/)

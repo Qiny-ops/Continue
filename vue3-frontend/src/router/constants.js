@@ -12,6 +12,8 @@ export const ROUTE_NAMES = {
   PROJECT_APITEST: 'project-apitest',
   PROJECT_APITEST_ENVIRONMENTS: 'project-apitest-environments',
   PROJECT_REQUIREMENTS: 'project-requirements',
+  PROJECT_CODECHECK: 'project-codecheck',
+  PROJECT_CODECHECK_DETAIL: 'project-codecheck-detail',
   // PROJECT_TESTPLANS: 'project-testplans', // TODO: 待实现
   // PROJECT_BUGS: 'project-bugs', // TODO: 待实现
   // PROJECT_REPORTS: 'project-reports', // TODO: 待实现

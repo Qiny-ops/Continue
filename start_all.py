@@ -62,6 +62,14 @@ SERVICES = {
         "check_file": ".env",
         "url": "http://localhost:8003/docs",
     },
+    "ai_check": {
+        "name": "AI Code Check Service",
+        "port": 8004,
+        "path": PROJECT_ROOT / "aicheck-service",
+        "command": ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8004", "--reload"],
+        "check_file": ".env",
+        "url": "http://localhost:8004/docs",
+    },
 }
 
 
@@ -148,6 +156,7 @@ def main() -> None:
     parser.add_argument("--skip-ai-generator", action="store_true", help="跳过 AI Generator 服务")
     parser.add_argument("--skip-api-testing", action="store_true", help="跳过 API Testing 服务")
     parser.add_argument("--skip-web-automation", action="store_true", help="跳过 Web Automation 服务")
+    parser.add_argument("--skip-ai-check", action="store_true", help="跳过 AI Code Check 服务")
 
     args = parser.parse_args()
 
@@ -165,6 +174,8 @@ def main() -> None:
         services_to_start.append("api_testing")
     if not args.skip_web_automation:
         services_to_start.append("web_automation")
+    if not args.skip_ai_check:
+        services_to_start.append("ai_check")
 
     # 启动服务
     success_count = 0

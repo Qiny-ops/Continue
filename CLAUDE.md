@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## 项目概述
 
-测试用例管理系统 —— 基于 Vue 3 前端 + Django REST 后端的全栈应用，搭配两个 FastAPI 微服务：AI 测试用例生成（ai-generator）、接口测试执行（api-testing）。通过 WeKnora 代理接入外部知识库。
+测试用例管理系统 —— 基于 Vue 3 前端 + Django REST 后端的全栈应用，搭配四个 FastAPI 微服务：AI 测试用例生成（ai-generator）、接口测试执行（api-testing）、Web 自动化（web-automation）、代码变更 AI 检查（ai-check）。通过 WeKnora 代理接入外部知识库。
 
 ## 开发命令
 
@@ -15,6 +15,7 @@ python start_all.py --skip-frontend  # 跳过前端
 python start_all.py --skip-backend   # 跳过后端
 python start_all.py --skip-ai-generator --skip-api-testing  # 跳过指定微服务
 python stop_all.py                   # 停止所有服务（按端口杀进程）
+python start_all.py --skip-ai-check  # 跳过 AI Code Check 微服务
 ```
 
 ### 前端 (vue3-frontend/)
@@ -49,6 +50,18 @@ python run_mcp_server.py                                  # 启动 MCP 服务器
 pytest tests/                                             # 运行测试
 ```
 
+### Web 自动化服务 (web-automation-service/) — 端口 8003
+```bash
+uvicorn app.main:app --host 0.0.0.0 --port 8003 --reload
+pytest tests/                                             # 运行测试
+```
+
+### AI 代码检查服务 (aicheck-service/) — 端口 8004
+```bash
+uvicorn app.main:app --host 0.0.0.0 --port 8004 --reload
+pytest tests/                                             # 运行测试
+```
+
 ## 架构
 
 ### 服务总览
@@ -60,6 +73,7 @@ pytest tests/                                             # 运行测试
 | ai-generator-service | 8001 | FastAPI + Pydantic v2 | LLM 驱动的测试用例生成 |
 | api-testing-service | 8002 | FastAPI + Pydantic v2 | 接口测试执行 + MCP 服务器 |
 | web-automation-service | 8003 | FastAPI + Pydantic v2 + Playwright | Web 自动化执行（语义锚点 + 看页面闭环） |
+| aicheck-service | 8004 | FastAPI + Pydantic v2 + claude_agent_sdk | 代码变更 AI 检查（Webhook + 门禁） |
 
 ### 数据流
 ```
@@ -71,6 +85,7 @@ Django 5 + DRF ( :8000, SQLite )
    ├─► httpx(线程池) ──► ai-generator  :8001   (LLM 生成用例)
    ├─► httpx(SSE 透传) ─► api-testing   :8002   (执行接口测试)
    ├─► httpx(SSE 透传) ─► web-automation :8003  (执行 Web 自动化用例)
+   ├─► httpx(同步)   ─► aicheck         :8004  (代码变更 AI 检查)
    └─► requests(同步)  ─► WeKnora       :3000   (外部知识库代理)
 ```
 
@@ -100,6 +115,7 @@ testcase/   → TestCaseRepository、TestCaseVersion、TestModule、TestCase | r
 knowledge/  → 知识库集成（WeKnora）| clients/ai_client.py views/
 apitest/    → 接口测试模型 | models.py serializers/ views/ services/
 requirement/ → 需求关联 | services/
+codecheck/  → 代码变更检查 | models.py clients/ services/ views/ serializers/ (调 aicheck-service)
 core/       → 公共基类、异常体系、中间件、权限装饰器、工具
 ```
 
@@ -110,10 +126,12 @@ core/       → 公共基类、异常体系、中间件、权限装饰器、工�
 - `/api/knowledge/` — 知识库 CRUD、搜索、agent 端点
 - `/api/apitest/` — 接口测试管理
 - `/api/requirements/` — 需求管理
+- `/api/codecheck/` — 代码变更检查（手动触发/任务列表/详情/同步）
+- `/api/codecheck/internal/cases/` — 微服务回调内部接口（按 project_code 拉用例，需 X-Internal-API-Key）
 
 ### 微服务独立原则（2026-09 起）
 
-三个 FastAPI 微服务之间**零共享依赖**（原 `common/` 共享包已于 2026-09 拆分下沉到各服务内部并删除）。每个服务自包含：
+四个 FastAPI 微服务之间**零共享依赖**（原 `common/` 共享包已于 2026-09 拆分下沉到各服务内部并删除）。每个服务自包含：
 - `config.py` — 全量定义自己的配置字段（模型 API、推理参数、重试、CORS 等）
 - `utils/logger.py` — 各自独立的日志实现（默认 stderr，MCP 安全）
 - `utils/json_parser.py` / `json_extractor.py` — 各自独立的 LLM JSON 解析实现
@@ -173,6 +191,9 @@ API 模块在 `src/api/modules/`（auth、project、testcase、knowledge、apite
 - `API_TESTING_SERVICE_URL` — 接口测试服务地址（默认 http://localhost:8002）
 - `WEB_AUTOMATION_SERVICE_URL` — Web 自动化服务地址（默认 http://localhost:8003）
 - `WEB_AUTOMATION_API_KEY` — 调用 Web 自动化服务时携带的 API Key（空=开发模式不强制）
+- `AICHECK_SERVICE_URL` — 代码检查服务地址（默认 http://localhost:8004）
+- `AICHECK_API_KEY` — 调用代码检查服务时携带的 API Key（空=开发模式不强制）
+- `AICHECK_INTERNAL_API_KEY` — 代码检查服务回调内部用例接口的 Key（X-Internal-API-Key）
 
 ### AI 生成服务 (ai-generator-service/.env)
 - `MODEL_API_KEY` — LLM API 密钥
@@ -189,6 +210,15 @@ API 模块在 `src/api/modules/`（auth、project、testcase、knowledge、apite
 - `WEB_MODEL_BASE_URL` / `WEB_MODEL_NAME` — Ollama 兜底（本地优先、离线可用，默认 `qwen2.5:3b`）
 - `HEADLESS` / `BROWSER_TIMEOUT` / `SCREENSHOT_DIR` — 浏览器与执行配置
 - `API_KEY` / `INTERNAL_API_KEY` — 安全配置（与 Django 侧 `WEB_AUTOMATION_API_KEY` / `INTERNAL_API_KEY` 对应）
+
+### 代码检查服务 (aicheck-service/.env)
+- `API_KEY` — Django 调用本服务时携带的 X-API-Key（空=开发模式放行）
+- `INTERNAL_API_KEY` — 本服务回调 Django 内部接口时的 X-Internal-API-Key
+- `CONCURRENCY` / `MAX_RETRIES` / `TIMEOUT` / `REQUEST_INTERVAL` — 课程要求：并发 3 / 重试 3 / 超时 300s / 请求间隔 1s
+- `RISK_BLOCK_LEVEL` — 风险等级 ≥ 该值直接阻断；可选 高/中/低（默认 高）
+- `GITHUB_WEBHOOK_SECRET` / `GITLAB_WEBHOOK_TOKEN` — Webhook 验签
+- `WATCH_BRANCHES` / `WEBHOOK_REPOS` — 分支过滤与仓库配置（JSON 字符串）
+- `GITHUB_STATUS_TOKEN` / `GITLAB_STATUS_TOKEN` / `GITLAB_BASE_URL` — Commit Status 上报
 
 ### 前端
 - `VITE_API_BASE_URL` — 后端地址（默认 http://localhost:8000/api）

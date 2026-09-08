@@ -105,6 +105,7 @@ def main() -> None:
         8001: "AI Generator Service",
         8002: "API Testing Service",
         8003: "Web Automation Service",
+        8004: "AI Code Check Service",
     }
 
     # 通过端口停止服务
