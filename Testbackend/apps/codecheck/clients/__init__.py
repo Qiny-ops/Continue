@@ -52,6 +52,7 @@ class AiCheckClient:
         test_cases: List[Dict[str, Any]],
         branch: str = "",
         commit_sha: str = "",
+        base_sha: str = "",
         case_source: str = "inline",
         project_code: str = "",
         gate: Optional[Dict[str, Any]] = None,
@@ -67,6 +68,8 @@ class AiCheckClient:
             payload["branch"] = branch
         if commit_sha:
             payload["commit_sha"] = commit_sha
+        if base_sha:
+            payload["base_sha"] = base_sha
         if case_source == "inline":
             payload["test_cases"] = test_cases
         elif case_source == "platform":

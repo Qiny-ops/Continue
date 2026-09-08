@@ -76,15 +76,20 @@ class CodeCheckTaskViewSet(viewsets.ViewSet):
                 repository_url=data.get("repository_url", "").strip(),
                 branch=data.get("branch", ""),
                 commit_sha=data.get("commit_sha", ""),
+                base_sha=data.get("base_sha", ""),
                 case_source=case_source,
                 project_code=project_code,
                 test_case_file=data.get("test_case_file", ""),
+                inline_test_cases=data.get("test_cases") or [],
                 gate=gate,
                 trigger_source="manual",
                 user=request.user,
             )
         except ValueError as e:
             raise ValidationError(str(e))
+        except Exception as e:
+            # AiCheckServiceError 等也归一为 400，避免冒泡 500
+            raise ValidationError(f"触发代码检查失败: {e}")
         return Response(
             CodeCheckTaskDetailSerializer(task).data,
             status=status.HTTP_201_CREATED,

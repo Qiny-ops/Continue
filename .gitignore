@@ -1,0 +1,13 @@
+
+# aicheck-service runtime
+aicheck-service/data/
+aicheck-service/workspaces/
+aicheck-service/.env
+aicheck-service/app/__pycache__/
+aicheck-service/app/*/__pycache__/
+aicheck-service/app/*/*/__pycache__/
+aicheck-service/tests/__pycache__/
+*.pyc
+*.pyo
+
+# Django migrations applied (keep 0001_initial tracked)

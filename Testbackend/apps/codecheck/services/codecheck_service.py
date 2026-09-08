@@ -71,9 +71,11 @@ def trigger_task(
     repository_url: str,
     branch: str = "",
     commit_sha: str = "",
+    base_sha: str = "",
     case_source: str = "platform",
     project_code: str = "",
     test_case_file: str = "",
+    inline_test_cases: Optional[List[Dict[str, Any]]] = None,
     gate: Optional[Dict[str, Any]] = None,
     trigger_source: str = "manual",
     user=None,
@@ -82,7 +84,7 @@ def trigger_task(
 
     case_source 决策：
       - platform: 从平台默认库拉用例，inline 传给微服务
-      - inline  : 平台不做用例提供（基本不会用，保留兼容）
+      - inline  : 直接用调用方传入的 inline_test_cases
       - file    : 直接把文件名传微服务
     """
     client = AiCheckClient()
@@ -92,10 +94,12 @@ def trigger_task(
         cases_for_inline = get_platform_cases(project_code)
         if not cases_for_inline:
             raise ValueError(f"项目 {project_code} 未配置默认用例库/活跃版本/任何用例")
-        case_source = "inline"  # 转 inline 传给微服务，避免 webhook 模式下再次回调
+        case_source = "inline"  # 转 inline 传给微服务
         trigger_payload_cases = cases_for_inline
     elif case_source == "inline":
-        trigger_payload_cases = []  # 平台无内联用例，触发侧另传
+        trigger_payload_cases = inline_test_cases or []
+        if not trigger_payload_cases:
+            raise ValueError("case_source=inline 时必须传入 test_cases")
     else:  # file
         trigger_payload_cases = []
 
@@ -105,6 +109,7 @@ def trigger_task(
         test_cases=trigger_payload_cases,
         branch=branch,
         commit_sha=commit_sha,
+        base_sha=base_sha,
         case_source=case_source,
         project_code=project_code,
         gate=gate,
