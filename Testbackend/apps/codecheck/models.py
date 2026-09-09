@@ -127,6 +127,12 @@ class CodeCheckResult(models.Model):
     )
     reason = models.TextField(blank=True, verbose_name="校验理由")
     success = models.BooleanField(default=False, verbose_name="是否通过")
+    # 结构化失败信息（审计报告直接引用）
+    failure_type = models.CharField(
+        max_length=32, blank=True, verbose_name="失败类型"
+    )
+    failure_reason = models.TextField(blank=True, verbose_name="失败原因")
+    evidence = models.TextField(blank=True, verbose_name="证据位置")
 
     class Meta:
         verbose_name = "用例检查结果"

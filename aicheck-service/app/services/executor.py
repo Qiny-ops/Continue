@@ -40,22 +40,42 @@ def _build_feature_desc(tc: TestCaseItem) -> str:
     return "\n".join(parts)
 
 
+def _build_failure(tc: TestCaseItem, ai: Dict[str, Any], result: str, reason: str) -> dict:
+    """构造结构化失败信息；模型没给时按结果类型兜底出一句可读的原因"""
+    ftype = (ai.get("失败类型") or "").strip()
+    freason = (ai.get("失败原因") or "").strip()
+    evidence = (ai.get("证据位置") or "").strip()
+
+    # 判「通过」时不需要失败原因
+    if result == "通过":
+        return {"failure_type": "", "failure_reason": "", "evidence": evidence}
+
+    if not ftype:
+        ftype = "校验执行异常" if result in ("异常", "解析失败", "解析错误") else "其他"
+    if not freason:
+        freason = {
+            "异常": f"AI 校验过程异常，未获得有效结论：{reason[:100]}",
+            "解析失败": f"模型返回内容无法解析为结论：{reason[:100]}",
+            "解析错误": f"模型返回内容无法解析为结论：{reason[:100]}",
+            "未知": "未获得有效校验结论",
+        }.get(result, f"用例「{tc.testpoint or tc.case_no}」未通过校验，详见审计证据")
+    return {"failure_type": ftype, "failure_reason": freason, "evidence": evidence}
+
+
 def _to_result_item(tc: TestCaseItem, ai: Dict[str, Any]) -> CheckResultItem:
     completed = ai.get("功能是否完成", "未知")
     reason = ai.get("校验理由", "无校验理由")
     if completed == "是":
-        return CheckResultItem(
-            case_no=tc.case_no, testpoint=tc.testpoint,
-            result="通过", reason=reason, success=True,
-        )
-    if completed == "否":
-        return CheckResultItem(
-            case_no=tc.case_no, testpoint=tc.testpoint,
-            result="失败", reason=reason, success=False,
-        )
+        result, success = "通过", True
+    elif completed == "否":
+        result, success = "失败", False
+    else:
+        result, success = (completed or "未知"), False
     return CheckResultItem(
         case_no=tc.case_no, testpoint=tc.testpoint,
-        result=completed or "未知", reason=reason, success=False,
+        steps=tc.steps or "", expectation=tc.expectation or "",
+        result=result, reason=reason, success=success,
+        **_build_failure(tc, ai, result, reason),
     )
 
 

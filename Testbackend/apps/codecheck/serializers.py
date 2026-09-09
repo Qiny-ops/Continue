@@ -12,6 +12,7 @@ class CodeCheckResultSerializer(serializers.ModelSerializer):
         fields = [
             "id", "case_no", "testpoint", "steps", "expectation",
             "result", "reason", "success",
+            "failure_type", "failure_reason", "evidence",
         ]
 
 

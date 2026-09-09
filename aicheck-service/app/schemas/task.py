@@ -25,6 +25,13 @@ class CheckResultItem(BaseModel):
     result: str = ""  # "通过" | "失败" | "异常" | "解析失败"
     reason: str = ""
     success: bool = False
+    # 当次用例原文快照：用例后续被修改时，历史报告仍有据可查
+    steps: str = ""
+    expectation: str = ""
+    # 结构化失败信息：供审计报告直接引用「为什么失败」
+    failure_type: str = ""    # 功能未实现 / 实现与预期不符 / ... / 校验执行异常
+    failure_reason: str = ""  # 一句话失败原因
+    evidence: str = ""        # 证据位置，如 src/views/Login.vue:119
 
 
 class DiffInfo(BaseModel):

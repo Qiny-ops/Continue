@@ -10,4 +10,11 @@ aicheck-service/tests/__pycache__/
 *.pyc
 *.pyo
 
+# WorkBuddy 本地数据（含敏感日志/凭据，禁止提交）
+.workbuddy/
+
+# 临时/演示文件
+_clean_audit.py
+codecheck_report_task20_sample.html
+
 # Django migrations applied (keep 0001_initial tracked)

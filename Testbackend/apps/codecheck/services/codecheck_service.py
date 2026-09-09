@@ -38,23 +38,37 @@ _CONCLUSION_MAP = {
 # ==================== 用例拉取 ====================
 
 def get_platform_cases(project_code: str) -> List[Dict[str, Any]]:
-    """按 project_code 拉取默认库的活跃版本下的全部用例"""
+    """按 project_code 拉取默认库的默认版本下的全部用例
+
+    版本选取优先级（2026-09-08 修订，修复 BUG-005）：
+      1. 默认库中 status=active 且 is_default=True 的版本
+      2. 无默认版本时，回退到 active 版本中 id 最大的（旧行为兜底）
+
+    case_no 直接取用例主键（2026-09-08 修订，修复 BUG-006），
+    与平台用例列表展示的 ID 列对齐，避免结果编号在平台里搜不到。
+    """
     project = Project.objects.filter(code=project_code).first()
     if not project:
         return []
     repo = TestCaseRepository.objects.filter(project=project, is_default=True).first()
     if not repo:
         return []
+
     version = (
-        TestCaseVersion.objects.filter(repository=repo, status="active")
-        .order_by("-id").first()
+        TestCaseVersion.objects.filter(
+            repository=repo, status="active", is_default=True
+        ).first()
+        or TestCaseVersion.objects.filter(repository=repo, status="active")
+        .order_by("-id")
+        .first()
     )
     if not version:
         return []
+
     cases = TestCase.objects.filter(version=version).order_by("id")
     return [
         {
-            "case_no": f"TC{c.id:04d}",
+            "case_no": str(c.id),
             "testpoint": c.title or "",
             "steps": c.steps or "",
             "expectation": c.expected_result or "",
@@ -186,12 +200,18 @@ def sync_task(task: CodeCheckTask) -> CodeCheckTask:
                     result=item.get("result", "未知") or "未知",
                     reason=item.get("reason", "") or "",
                     success=bool(item.get("success", False)),
+                    failure_type=item.get("failure_type", "") or "",
+                    failure_reason=item.get("failure_reason", "") or "",
+                    evidence=item.get("evidence", "") or "",
                 )
             else:
                 obj.testpoint = item.get("testpoint", "") or obj.testpoint
                 obj.result = item.get("result", obj.result) or obj.result
                 obj.reason = item.get("reason", "") or obj.reason
                 obj.success = bool(item.get("success", obj.success))
+                obj.failure_type = item.get("failure_type", "") or obj.failure_type
+                obj.failure_reason = item.get("failure_reason", "") or obj.failure_reason
+                obj.evidence = item.get("evidence", "") or obj.evidence
                 obj.save()
         # 删除已不见的
         for cn, obj in existing.items():

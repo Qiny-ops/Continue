@@ -9,11 +9,14 @@
 """
 import logging
 
+from django.http import HttpResponse
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.exceptions import ValidationError, NotFound
+
+from django.db.models import Q
 
 from apps.users.authentication import JWTAuthentication
 from apps.codecheck.models import CodeCheckTask
@@ -23,20 +26,59 @@ from apps.codecheck.serializers import (
 from apps.codecheck.services.codecheck_service import (
     sync_task, trigger_task,
 )
+from apps.codecheck.services.report_html import build_audit_report_html
 from apps.projects.models import Project
 
 logger = logging.getLogger(__name__)
 
 
-class CodeCheckTaskViewSet(viewsets.ViewSet):
+class CodeCheckTaskViewSet(viewsets.GenericViewSet):
     authentication_classes = [JWTAuthentication]
     permission_classes = [IsAuthenticated]
 
     def list(self, request):
+        """
+        任务列表
+
+        支持：project / project_code、status、risk_level、conclusion、search 过滤
+        传 page / page_size 时返回分页结构 {count, results}，否则返回数组（兼容旧调用）
+        """
         qs = CodeCheckTask.objects.all().order_by("-created_at")
+
         project_id = request.query_params.get("project")
+        project_code = request.query_params.get("project_code")
         if project_id:
             qs = qs.filter(project_id=project_id)
+        if project_code:
+            qs = qs.filter(project__code=project_code)
+
+        status_filter = request.query_params.get("status")
+        if status_filter:
+            qs = qs.filter(status=status_filter)
+
+        risk_level = request.query_params.get("risk_level")
+        if risk_level:
+            qs = qs.filter(risk_level=risk_level)
+
+        conclusion = request.query_params.get("conclusion")
+        if conclusion:
+            qs = qs.filter(conclusion=conclusion)
+
+        keyword = (request.query_params.get("search") or "").strip()
+        if keyword:
+            qs = qs.filter(
+                Q(repository_url__icontains=keyword)
+                | Q(branch__icontains=keyword)
+                | Q(commit_sha__icontains=keyword)
+                | Q(project_name__icontains=keyword)
+            )
+
+        if request.query_params.get("page") or request.query_params.get("page_size"):
+            page = self.paginate_queryset(qs)
+            if page is not None:
+                return self.get_paginated_response(
+                    CodeCheckTaskListSerializer(page, many=True).data
+                )
         return Response(CodeCheckTaskListSerializer(qs, many=True).data)
 
     def retrieve(self, request, pk=None):
@@ -103,3 +145,29 @@ class CodeCheckTaskViewSet(viewsets.ViewSet):
             raise NotFound("任务不存在")
         sync_task(task)
         return Response(CodeCheckTaskDetailSerializer(task).data)
+
+    @action(detail=True, methods=["get"], url_path="report")
+    def report(self, request, pk=None):
+        """
+        导出「自包含 HTML 审计报告」
+
+        返回一份 CSS 全部内联、不依赖任何外部资源的 HTML 文件，
+        可直接双击在浏览器打开、脱离平台转发 / 归档。
+        """
+        try:
+            task = CodeCheckTask.objects.get(pk=pk)
+        except CodeCheckTask.DoesNotExist:
+            raise NotFound("任务不存在")
+        # 生成报告前确保拉回最新结果（运行中/等待中的任务）
+        if task.status in ("running", "pending"):
+            try:
+                sync_task(task)
+            except Exception:
+                pass
+        html = build_audit_report_html(task)
+        filename = f"ACR-{task.id:04d}.html"
+        response = HttpResponse(html, content_type="text/html; charset=utf-8")
+        response["Content-Disposition"] = (
+            f'attachment; filename="{filename}"; filename*=UTF-8\'\'{filename}'
+        )
+        return response

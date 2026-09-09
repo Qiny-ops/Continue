@@ -50,6 +50,19 @@ const codeCheckApi = {
       handleApiError(error, 'CodeCheckTask')
       throw error
     }
+  },
+
+  /** 导出「自包含 HTML 审计报告」（返回 Blob，前端触发下载） */
+  async exportReport(id) {
+    try {
+      const response = await axios.get(`${BASE_URL}/${id}/report/`, {
+        responseType: 'blob',
+      })
+      return response
+    } catch (error) {
+      handleApiError(error, 'CodeCheckTask')
+      throw error
+    }
   }
 }
 
