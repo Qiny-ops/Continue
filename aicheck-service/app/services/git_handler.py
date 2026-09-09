@@ -153,6 +153,15 @@ class GitHandler:
         before = (before or "").strip()
         after = (after or head).strip()
 
+        # 本次提交的作者（提交人）——独立于"触发检查的人"
+        commit_author = ""
+        try:
+            commit_author = (
+                await _run(["git", "log", "-1", "--format=%an", after], project_path)
+            ).strip()
+        except GitError:
+            pass
+
         # 初始提交场景
         if not before or before == after:
             count_raw = await _run(
@@ -172,8 +181,13 @@ class GitHandler:
                     "full_diff": full_diff,
                     "commit_before": "初始提交",
                     "commit_after": head,
+                    "commit_author": commit_author,
                     "summary": stat,
                 }
+            # BUG-014：before 缺省或等于 after（base_sha 未传时 task_manager 会
+            # 把 before 回退成 commit_sha 自身），导致 git diff X X 恒为空，
+            # 误判"无代码变更内容"。此处回退到 after 的父提交，取"本次提交"的 diff。
+            before = f"{after}^"
 
         # 增量 diff
         try:
@@ -207,5 +221,6 @@ class GitHandler:
             "full_diff": full_diff,
             "commit_before": before,
             "commit_after": after,
+            "commit_author": commit_author,
             "summary": stat,
         }

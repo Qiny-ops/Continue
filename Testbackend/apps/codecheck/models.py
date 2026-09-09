@@ -44,6 +44,7 @@ class CodeCheckTask(models.Model):
     repository_url = models.CharField(max_length=1024, verbose_name="仓库地址")
     branch = models.CharField(max_length=255, blank=True, verbose_name="分支")
     commit_sha = models.CharField(max_length=64, blank=True, verbose_name="Commit SHA")
+    commit_author = models.CharField(max_length=128, blank=True, verbose_name="提交人")
 
     # 微服务侧 task_id（用于回写）
     service_task_id = models.CharField(

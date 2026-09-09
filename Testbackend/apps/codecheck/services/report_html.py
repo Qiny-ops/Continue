@@ -182,7 +182,8 @@ def _collect(task):
     generated_at = now.strftime("%Y-%m-%d %H:%M")
     date_only = now.strftime("%Y-%m-%d")
 
-    created_by = task.created_by.username if task.created_by else "-"
+    # 提交人 = git commit 作者（优先），回退到"触发检查的人"
+    created_by = task.commit_author or (task.created_by.username if task.created_by else "-")
 
     conclusion = task.conclusion
     c_label = CONCLUSION_LABEL.get(conclusion, "-")

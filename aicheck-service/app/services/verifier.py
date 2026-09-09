@@ -94,8 +94,10 @@ def _build_feature_prompt(source_path: str, feature_desc: str, diff_context: str
     diff_section = ""
     if diff_context:
         diff_section = (
-            f"\n本次代码变更内容（diff）：\n{diff_context[:3000]}\n\n"
-            "请重点关注本次变更中涉及的功能实现，判断变更是否实现了所需功能。\n"
+            f"\n本次代码变更内容（diff，仅供定位改动范围参考，不作为功能是否实现的判定依据）：\n{diff_context[:3000]}\n\n"
+            "功能判定务必依据【源码路径】下的完整代码来核对测试点是否实现；"
+            "若本次 diff 未涉及该测试点的功能，不得据此判「用例与代码库不匹配」或「无法定位」，"
+            "应回到完整源码中查找对应实现。\n"
         )
 
     return (

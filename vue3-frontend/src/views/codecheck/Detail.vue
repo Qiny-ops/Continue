@@ -60,6 +60,12 @@
         <section class="risk-advice">
           <p class="ra-text">{{ verdictText }}</p>
           <div v-if="task.risk_reason" class="ra-risk" :class="{ high: task.risk_level === '高' }">{{ task.risk_reason }}</div>
+          <div v-if="riskFiles.length" class="ra-files">
+            <span class="ra-files-label">高风险文件</span>
+            <div class="ra-file-list">
+              <span v-for="f in riskFiles" :key="f" class="file-tag">{{ f }}</span>
+            </div>
+          </div>
           <ul v-if="topSuggestions.length" class="ra-list">
             <li v-for="(s, i) in topSuggestions" :key="i">{{ s }}</li>
           </ul>
@@ -155,7 +161,7 @@
                   <th>用例来源</th><td>{{ caseSourceLabel(task.case_source) }}</td>
                 </tr>
                 <tr>
-                  <th>提交人</th><td>{{ task.created_by || '-' }}</td>
+                  <th>提交人</th><td>{{ task.commit_author || task.created_by_name || task.created_by || '-' }}</td>
                   <th>检查时间</th><td>{{ formatTime(task.created_at) }}</td>
                 </tr>
                 <tr>
@@ -210,7 +216,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
+import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { ArrowLeft, ArrowDown, Refresh, RefreshRight, Loading, Document, Download } from '@element-plus/icons-vue'
@@ -237,19 +243,34 @@ let cancelled = false
 
 /* ---------- 数据获取 ---------- */
 async function fetchDetail() {
-  if (cancelled || !taskId.value) return
+  const id = taskId.value
+  if (cancelled || !id) return
   loading.value = true
   try {
-    const data = await codeCheckApi.getTaskDetail(taskId.value)
-    if (cancelled) return
+    const data = await codeCheckApi.getTaskDetail(id)
+    // 竞态保护：请求期间若已切换到其它任务，丢弃本次结果
+    if (cancelled || taskId.value !== id) return
     task.value = data
     // 失败 / 异常用例默认展开，通过用例默认折叠
     openSet.value = new Set(findings.value.map((r, i) => `${r.case_no}-${i}`))
   } catch { /* 错误已统一处理 */ }
   finally {
-    if (!cancelled) loading.value = false
+    if (!cancelled && taskId.value === id) loading.value = false
   }
 }
+
+// 切换任务时重置状态并重新加载，避免显示上一个详情的缓存
+watch(taskId, (nid, oid) => {
+  if (nid === oid) return
+  task.value = null
+  openSet.value = new Set()
+  diffFold.value = true
+  metaFold.value = true
+  passedFold.value = true
+  stopPolling()
+  fetchDetail()
+  startPolling()
+})
 
 function startPolling() {
   stopPolling()
@@ -621,6 +642,10 @@ onBeforeUnmount(() => {
   white-space: pre-wrap;
 }
 .ra-risk.high { background: var(--fail-bg); border-left-color: var(--fail-line); color: var(--fail-ink); }
+.ra-files { margin-top: 8px; display: flex; align-items: flex-start; flex-wrap: wrap; gap: 6px; }
+.ra-files-label { font-size: 12px; color: var(--ink-400); line-height: 1.7; }
+.ra-file-list { display: flex; flex-wrap: wrap; gap: 6px; }
+.file-tag { padding: 2px 8px; background: var(--fail-bg); color: var(--fail); border: 1px solid var(--fail-line); border-radius: 2px; font-size: 12px; font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace; word-break: break-all; }
 .ra-list { margin: 8px 0 0; padding-left: 18px; font-size: 12px; line-height: 1.9; color: var(--ink-800); }
 .ra-more { margin-top: 4px; font-size: 11px; color: var(--ink-400); }
 

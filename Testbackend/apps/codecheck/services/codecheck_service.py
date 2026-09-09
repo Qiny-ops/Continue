@@ -171,6 +171,7 @@ def sync_task(task: CodeCheckTask) -> CodeCheckTask:
     task.risk_files = risk.get("high_risk_files", []) or []
     task.risk_reason = risk.get("reason", "") or ""
     task.diff_info = data.get("diff") or {}
+    task.commit_author = (data.get("diff") or {}).get("commit_author", "") or task.commit_author
     task.summary = data.get("summary") or {}
     task.error = data.get("error", "") or ""
 

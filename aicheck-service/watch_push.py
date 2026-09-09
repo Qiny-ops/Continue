@@ -84,7 +84,7 @@ def login() -> str:
     return (data.get("data") or {}).get("token", "")
 
 
-def trigger(token: str, project_code: str, repo: str, branch: str, sha: str) -> dict:
+def trigger(token: str, project_code: str, repo: str, branch: str, sha: str, base_sha: str = "") -> dict:
     payload = {
         "project_code": project_code,
         "repository_url": f"https://github.com/{repo}.git",
@@ -93,6 +93,10 @@ def trigger(token: str, project_code: str, repo: str, branch: str, sha: str) -> 
         "case_source": "platform",
         "trigger_source": "webhook",
     }
+    # BUG-014：把"上一次看到的 HEAD"作为 base_sha 传入，让 diff 对比
+    # last_sha..sha（覆盖 60s 内连推多 commit 的完整变更），而非空 diff。
+    if base_sha and base_sha != sha:
+        payload["base_sha"] = base_sha
     req = urllib.request.Request(
         f"{DJANGO_BASE_URL}/api/codecheck/",
         data=json.dumps(payload).encode("utf-8"),
@@ -149,7 +153,7 @@ def main() -> int:
                 _log(f"检测到新提交 {last_sha[:8]} → {sha[:8]}，触发检查")
                 try:
                     token = login()
-                    r = trigger(token, args.project_code, args.repo, args.branch, sha)
+                    r = trigger(token, args.project_code, args.repo, args.branch, sha, base_sha=last_sha)
                     _log(f"已触发 task id={r.get('id')} status={r.get('status')}")
                     state[key] = sha
                     save_state(state)

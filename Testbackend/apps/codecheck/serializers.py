@@ -17,26 +17,35 @@ class CodeCheckResultSerializer(serializers.ModelSerializer):
 
 
 class CodeCheckTaskListSerializer(serializers.ModelSerializer):
+    created_by_name = serializers.SerializerMethodField()
+
     class Meta:
         model = CodeCheckTask
         fields = [
             "id", "project", "project_name", "repository_url", "branch",
-            "service_task_id", "trigger_source", "case_source", "status",
+            "service_task_id", "trigger_source", "case_source", "commit_author", "status",
             "progress", "risk_level", "risk_score", "conclusion",
-            "gate_provider", "gate_state", "created_by", "created_at", "updated_at",
+            "gate_provider", "gate_state", "created_by", "created_by_name", "created_at", "updated_at",
         ]
+
+    def get_created_by_name(self, obj):
+        return obj.created_by.username if obj.created_by else ""
 
 
 class CodeCheckTaskDetailSerializer(serializers.ModelSerializer):
     results = CodeCheckResultSerializer(many=True, read_only=True)
+    created_by_name = serializers.SerializerMethodField()
 
     class Meta:
         model = CodeCheckTask
         fields = [
             "id", "project", "project_name", "repository_url", "branch",
-            "commit_sha", "service_task_id", "trigger_source", "case_source",
+            "commit_sha", "commit_author", "service_task_id", "trigger_source", "case_source",
             "test_case_file", "status", "progress", "risk_level", "risk_score",
             "risk_files", "risk_reason", "diff_info", "summary", "conclusion",
             "gate_provider", "gate_state", "gate_response", "error",
-            "results", "created_by", "created_at", "updated_at",
+            "results", "created_by", "created_by_name", "created_at", "updated_at",
         ]
+
+    def get_created_by_name(self, obj):
+        return obj.created_by.username if obj.created_by else ""
