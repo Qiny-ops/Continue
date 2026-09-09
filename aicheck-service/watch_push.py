@@ -91,6 +91,7 @@ def trigger(token: str, project_code: str, repo: str, branch: str, sha: str) -> 
         "branch": branch,
         "commit_sha": sha,
         "case_source": "platform",
+        "trigger_source": "webhook",
     }
     req = urllib.request.Request(
         f"{DJANGO_BASE_URL}/api/codecheck/",

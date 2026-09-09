@@ -104,6 +104,10 @@ class CodeCheckTaskViewSet(viewsets.GenericViewSet):
         if case_source not in ("platform", "inline", "file"):
             raise ValidationError("case_source 仅支持 platform/inline/file")
 
+        trigger_source = data.get("trigger_source", "manual").strip() or "manual"
+        if trigger_source not in ("manual", "webhook"):
+            raise ValidationError("trigger_source 仅支持 manual/webhook")
+
         gate = data.get("gate")
         if isinstance(gate, dict) and gate.get("provider"):
             if gate["provider"] not in ("github", "gitlab"):
@@ -124,7 +128,7 @@ class CodeCheckTaskViewSet(viewsets.GenericViewSet):
                 test_case_file=data.get("test_case_file", ""),
                 inline_test_cases=data.get("test_cases") or [],
                 gate=gate,
-                trigger_source="manual",
+                trigger_source=trigger_source,
                 user=request.user,
             )
         except ValueError as e:
